@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -30,7 +29,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             children: [
               const SizedBox(height: 40),
 
-              /// 🔰 TITLE
+              /// TITLE
               const Text(
                 "Welcome Back",
                 style: TextStyle(
@@ -42,7 +41,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 30),
 
-              /// 📧 EMAIL FIELD
+              /// EMAIL
               _inputField(
                 controller: emailController,
                 hint: "Email Address",
@@ -50,7 +49,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 15),
 
-              /// 🔑 PASSWORD FIELD
+              /// PASSWORD
               _inputField(
                 controller: passwordController,
                 hint: "Password",
@@ -63,7 +62,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 },
               ),
 
-              /// 🔁 FORGOT PASSWORD
+              /// FORGOT PASSWORD
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -77,7 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 10),
 
-              /// 🔐 LOGIN BUTTON
+              /// LOGIN BUTTON
               authState.isLoading
                   ? const CircularProgressIndicator()
                   : SizedBox(
@@ -94,13 +93,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           final messenger =
                               ScaffoldMessenger.of(context);
 
+                          final email =
+                              emailController.text.trim();
+                          final password =
+                              passwordController.text.trim();
+
+                          /// VALIDATION
+                          if (email.isEmpty || password.isEmpty) {
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text("Enter all fields")),
+                            );
+                            return;
+                          }
+
                           try {
                             await ref
                                 .read(authStateProvider.notifier)
-                                .login(
-                                  emailController.text.trim(),
-                                  passwordController.text.trim(),
-                                );
+                                .login(email, password);
 
                             final user =
                                 ref.read(authStateProvider).user;
@@ -115,10 +126,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               }
                             }
                           } catch (e) {
-                            if (!mounted) return;
-
                             messenger.showSnackBar(
-                              SnackBar(content: Text(e.toString())),
+                              SnackBar(
+                                  content: Text(e.toString())),
                             );
                           }
                         },
@@ -131,7 +141,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 20),
 
-              /// ➖ OR DIVIDER
+              /// DIVIDER
               Row(
                 children: [
                   Expanded(child: Divider(color: Colors.grey[400])),
@@ -145,7 +155,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 20),
 
-              /// 🔴 GOOGLE SIGN-IN
+              /// GOOGLE LOGIN
               Container(
                 width: double.infinity,
                 height: 50,
@@ -173,10 +183,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         context.go('/farmer');
                       }
                     } catch (e) {
-                      if (!mounted) return;
-
                       messenger.showSnackBar(
-                        SnackBar(content: Text(e.toString())),
+                        SnackBar(
+                            content: Text(e.toString())),
                       );
                     }
                   },
@@ -193,15 +202,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 30),
 
-              /// 🔁 REGISTER NAV
+              /// REGISTER NAV
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text("Don't have an account? "),
                   GestureDetector(
-                    onTap: () {
-                      context.go('/register');
-                    },
+                    onTap: () => context.go('/register'),
                     child: const Text(
                       "SIGN UP",
                       style: TextStyle(
@@ -219,7 +226,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  /// 🧩 INPUT FIELD
+  /// INPUT FIELD
   Widget _inputField({
     required TextEditingController controller,
     required String hint,

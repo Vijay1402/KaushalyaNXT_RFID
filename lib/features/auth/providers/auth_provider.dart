@@ -31,10 +31,9 @@ class AuthController extends StateNotifier<AuthState> {
 
   AuthController(this.ref) : super(AuthState());
 
-  /// 🔥 AUTO LOGIN
+  /// AUTO LOGIN
   Future<void> checkLogin() async {
     final authService = ref.read(authServiceProvider);
-
     final firebaseUser = authService.getCurrentUser();
 
     if (firebaseUser != null) {
@@ -57,15 +56,22 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  /// LOGIN
   Future<void> login(String email, String password) async {
     state = state.copyWith(isLoading: true);
 
-    final user =
-        await ref.read(authServiceProvider).login(email, password);
+    try {
+      final user =
+          await ref.read(authServiceProvider).login(email, password);
 
-    state = AuthState(user: user);
+      state = AuthState(user: user, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
   }
 
+  /// REGISTER
   Future<void> register({
     required String name,
     required String email,
@@ -74,26 +80,38 @@ class AuthController extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true);
 
-    final user =
-        await ref.read(authServiceProvider).register(
-      name: name,
-      email: email,
-      password: password,
-      role: role,
-    );
+    try {
+      final user =
+          await ref.read(authServiceProvider).register(
+        name: name,
+        email: email,
+        password: password,
+        role: role,
+      );
 
-    state = AuthState(user: user);
+      state = AuthState(user: user, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
   }
 
+  /// GOOGLE LOGIN
   Future<void> loginWithGoogle() async {
     state = state.copyWith(isLoading: true);
 
-    final user =
-        await ref.read(authServiceProvider).signInWithGoogle();
+    try {
+      final user =
+          await ref.read(authServiceProvider).signInWithGoogle();
 
-    state = AuthState(user: user);
+      state = AuthState(user: user, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
   }
 
+  /// LOGOUT
   Future<void> logout() async {
     await ref.read(authServiceProvider).logout();
     state = AuthState();

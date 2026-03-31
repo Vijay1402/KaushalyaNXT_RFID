@@ -5,6 +5,7 @@ import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/farmer/dashboard/farmer_dashboard.dart';
+import '../../features/farmer/my_trees/my_trees_screen.dart';
 import 'route_paths.dart';
 
 GoRouter createRouter(Ref ref) {
@@ -16,11 +17,14 @@ GoRouter createRouter(Ref ref) {
     /// 🔥 FIXED REDIRECT LOGIC
     redirect: (context, state) {
       final loggedIn = authState.user != null;
-
+      final location = state.matchedLocation;
       final isLogin = state.matchedLocation == RoutePaths.login;
       final isRegister = state.matchedLocation == RoutePaths.register;
 
       // ✅ Allow login & register when NOT logged in
+      if (loggedIn && state.matchedLocation == '/my-trees') {
+        return null; // allow navigation
+      }
       if (!loggedIn && !isLogin && !isRegister) {
         return RoutePaths.login;
       }
@@ -50,6 +54,10 @@ GoRouter createRouter(Ref ref) {
       GoRoute(
         path: RoutePaths.farmerHome,
         builder: (context, state) => const FarmerDashboard(),
+      ),
+      GoRoute(
+        path: '/my-trees',
+        builder: (context, state) => const MyTreesScreen(),
       ),
     ],
   );

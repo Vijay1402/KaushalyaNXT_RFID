@@ -5,8 +5,6 @@ import '../../data/models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  /// ✅ FIX: expose firestore
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
   /// 🔐 CURRENT USER
@@ -14,84 +12,109 @@ class AuthService {
     return _auth.currentUser;
   }
 
-  /// 🔐 LOGIN
+  /// 🔐 LOGIN (FIXED + SAFE)
   Future<UserModel> login(String email, String password) async {
-    final credential = await _auth.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-    final uid = credential.user!.uid;
+      final user = credential.user;
+      if (user == null) throw Exception("Login failed");
 
-    final doc = await firestore.collection('users').doc(uid).get();
-    final data = doc.data()!;
+      final doc =
+          await firestore.collection('users').doc(user.uid).get();
 
-    return UserModel(
-      name: data['name'],
-      email: data['email'],
-      role: data['role'],
-    );
+      if (!doc.exists) {
+        throw Exception("User data not found in database");
+      }
+
+      final data = doc.data()!;
+
+      return UserModel(
+        name: data['name'] ?? '',
+        email: data['email'] ?? '',
+        role: data['role'] ?? 'farmer',
+      );
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? "Login failed");
+    }
   }
 
-  /// 📝 REGISTER
+  /// 📝 REGISTER (SAFE)
   Future<UserModel> register({
     required String name,
     required String email,
     required String password,
     required String role,
   }) async {
-    final credential = await _auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    try {
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-    final uid = credential.user!.uid;
+      final user = credential.user;
+      if (user == null) throw Exception("Registration failed");
 
-    await firestore.collection('users').doc(uid).set({
-      'name': name,
-      'email': email,
-      'role': role,
-    });
+      await firestore.collection('users').doc(user.uid).set({
+        'name': name,
+        'email': email,
+        'role': role,
+      });
 
-    return UserModel(name: name, email: email, role: role);
+      return UserModel(
+        name: name,
+        email: email,
+        role: role,
+      );
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? "Registration failed");
+    }
   }
 
-  /// 🔴 GOOGLE LOGIN
+  /// 🔴 GOOGLE LOGIN (IMPROVED)
   Future<UserModel> signInWithGoogle() async {
-    final googleUser = await GoogleSignIn().signIn();
+    try {
+      final googleUser = await GoogleSignIn().signIn();
 
-    if (googleUser == null) {
-      throw Exception("Google Sign-In cancelled");
+      if (googleUser == null) {
+        throw Exception("Google Sign-In cancelled");
+      }
+
+      final googleAuth = await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential =
+          await _auth.signInWithCredential(credential);
+
+      final user = userCredential.user;
+      if (user == null) throw Exception("Google login failed");
+
+      final doc =
+          await firestore.collection('users').doc(user.uid).get();
+
+      if (!doc.exists) {
+        await firestore.collection('users').doc(user.uid).set({
+          'name': user.displayName ?? '',
+          'email': user.email ?? '',
+          'role': 'farmer',
+        });
+      }
+
+      return UserModel(
+        name: user.displayName ?? '',
+        email: user.email ?? '',
+        role: 'farmer',
+      );
+    } catch (e) {
+      throw Exception(e.toString());
     }
-
-    final googleAuth = await googleUser.authentication;
-
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    final userCredential =
-        await _auth.signInWithCredential(credential);
-
-    final user = userCredential.user!;
-    final uid = user.uid;
-
-    final doc = await firestore.collection('users').doc(uid).get();
-
-    if (!doc.exists) {
-      await firestore.collection('users').doc(uid).set({
-        'name': user.displayName ?? '',
-        'email': user.email ?? '',
-        'role': 'farmer',
-      });
-    }
-
-    return UserModel(
-      name: user.displayName ?? '',
-      email: user.email ?? '',
-      role: 'farmer',
-    );
   }
 
   /// 🚪 LOGOUT
