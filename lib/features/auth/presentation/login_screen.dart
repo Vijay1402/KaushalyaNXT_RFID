@@ -1,0 +1,265 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../providers/auth_provider.dart';
+
+class LoginScreen extends ConsumerStatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+
+  bool obscurePassword = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authStateProvider);
+
+    return Scaffold(
+      backgroundColor: Colors.grey[200],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+
+              /// 🔰 TITLE
+              const Text(
+                "Welcome Back",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+
+              const SizedBox(height: 30),
+
+              /// 📧 EMAIL FIELD
+              _inputField(
+                controller: emailController,
+                hint: "Email Address",
+              ),
+
+              const SizedBox(height: 15),
+
+              /// 🔑 PASSWORD FIELD
+              _inputField(
+                controller: passwordController,
+                hint: "Password",
+                isPassword: true,
+                obscure: obscurePassword,
+                onToggle: () {
+                  setState(() {
+                    obscurePassword = !obscurePassword;
+                  });
+                },
+              ),
+
+              /// 🔁 FORGOT PASSWORD
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {},
+                  child: const Text(
+                    "Forget password?",
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              /// 🔐 LOGIN BUTTON
+              authState.isLoading
+                  ? const CircularProgressIndicator()
+                  : SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green[700],
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        onPressed: () async {
+                          final messenger =
+                              ScaffoldMessenger.of(context);
+
+                          try {
+                            await ref
+                                .read(authStateProvider.notifier)
+                                .login(
+                                  emailController.text.trim(),
+                                  passwordController.text.trim(),
+                                );
+
+                            final user =
+                                ref.read(authStateProvider).user;
+
+                            if (!mounted) return;
+
+                            if (user != null) {
+                              if (user.role == 'farmer') {
+                                context.go('/farmer');
+                              } else {
+                                context.go('/kvk');
+                              }
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+
+                            messenger.showSnackBar(
+                              SnackBar(content: Text(e.toString())),
+                            );
+                          }
+                        },
+                        child: const Text(
+                          "LOG IN",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+
+              const SizedBox(height: 20),
+
+              /// ➖ OR DIVIDER
+              Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.grey[400])),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text("OR"),
+                  ),
+                  Expanded(child: Divider(color: Colors.grey[400])),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              /// 🔴 GOOGLE SIGN-IN
+              Container(
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.black26),
+                  color: Colors.white,
+                ),
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final messenger =
+                        ScaffoldMessenger.of(context);
+
+                    try {
+                      await ref
+                          .read(authStateProvider.notifier)
+                          .loginWithGoogle();
+
+                      final user =
+                          ref.read(authStateProvider).user;
+
+                      if (!mounted) return;
+
+                      if (user != null) {
+                        context.go('/farmer');
+                      }
+                    } catch (e) {
+                      if (!mounted) return;
+
+                      messenger.showSnackBar(
+                        SnackBar(content: Text(e.toString())),
+                      );
+                    }
+                  },
+                  icon: Image.network(
+                    'https://cdn-icons-png.flaticon.com/512/300/300221.png',
+                    height: 20,
+                  ),
+                  label: const Text(
+                    "CONTINUE WITH GOOGLE",
+                    style: TextStyle(color: Colors.black87),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 30),
+
+              /// 🔁 REGISTER NAV
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("Don't have an account? "),
+                  GestureDetector(
+                    onTap: () {
+                      context.go('/register');
+                    },
+                    child: const Text(
+                      "SIGN UP",
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 🧩 INPUT FIELD
+  Widget _inputField({
+    required TextEditingController controller,
+    required String hint,
+    bool isPassword = false,
+    bool obscure = false,
+    VoidCallback? onToggle,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 4,
+            color: Colors.black12,
+          )
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscure,
+        decoration: InputDecoration(
+          hintText: hint,
+          border: InputBorder.none,
+          prefixIcon:
+              isPassword ? const Icon(Icons.lock_outline) : null,
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    obscure
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                  ),
+                  onPressed: onToggle,
+                )
+              : null,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        ),
+      ),
+    );
+  }
+}
