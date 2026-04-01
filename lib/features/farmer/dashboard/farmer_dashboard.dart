@@ -9,15 +9,17 @@ class FarmerDashboard extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[200],
 
-      /// 🔵 FLOATING BUTTON
+      /// 🔵 FLOATING BUTTON (SCAN FIXED)
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.blue,
-        onPressed: () {},
+        onPressed: () {
+          context.push('/scan'); // ✅ FIXED
+        },
         child: const Icon(Icons.qr_code),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
-      /// 🔻 BOTTOM NAV (FIXED OVERFLOW)
+      /// 🔻 BOTTOM NAV
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         child: Padding(
@@ -27,34 +29,42 @@ class FarmerDashboard extends StatelessWidget {
             children: [
               _navItem(Icons.home, "Home", isActive: true),
 
+              /// 🌳 MY TREES
               InkWell(
-                onTap: () => context.go('/my-trees'),
+                onTap: () => context.push('/my-trees'), // ✅ FIXED
                 child: _navItem(Icons.park, "My Trees"),
               ),
 
               const SizedBox(width: 40),
 
-              _navItem(Icons.insert_chart, "Report"),
-              _navItem(Icons.person, "Profile"),
+              InkWell(
+                onTap: () => context.push('/report'), // 🔥 IMPORTANT
+                child: _navItem(Icons.insert_chart, "Report"),
+              ),
+              /// 👤 PROFILE (BOTTOM)
+              InkWell(
+                onTap: () => context.push('/profile'), // ✅ FIXED
+                child: _navItem(Icons.person, "Profile"),
+              ),
             ],
           ),
         ),
       ),
 
-      /// 🔥 BODY (SCROLL FIXED)
+      /// 🔥 BODY
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
-              mainAxisSize: MainAxisSize.min, // 🔥 FIX
+              mainAxisSize: MainAxisSize.min,
               children: [
                 /// HEADER
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
+                  children: [
                     Row(
-                      children: [
+                      children: const [
                         CircleAvatar(
                           backgroundColor: Colors.green,
                           child: Icon(Icons.agriculture, color: Colors.white),
@@ -70,7 +80,23 @@ class FarmerDashboard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    Icon(Icons.notifications),
+
+                    /// 🔔 + PROFILE (TOP)
+                    Row(
+                      children: [
+                        const Icon(Icons.notifications),
+                        const SizedBox(width: 10),
+
+                        InkWell(
+                          onTap: () => context.push('/profile'), // ✅ FIXED
+                          child: CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.grey[300],
+                            child: const Icon(Icons.person, color: Colors.black),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
 
@@ -85,7 +111,7 @@ class FarmerDashboard extends StatelessWidget {
                     border: Border.all(color: Colors.green),
                   ),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min, // 🔥 FIX
+                    mainAxisSize: MainAxisSize.min,
                     children: const [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -141,7 +167,7 @@ class FarmerDashboard extends StatelessWidget {
 
                 const SizedBox(height: 10),
 
-                /// TASK LIST (FIXED)
+                /// TASK LIST
                 ListView(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -174,20 +200,20 @@ class FarmerDashboard extends StatelessWidget {
     );
   }
 
-  /// 🔻 NAV ITEM (FIXED OVERFLOW)
+  /// NAV ITEM
   Widget _navItem(IconData icon, String label, {bool isActive = false}) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, color: isActive ? Colors.green : Colors.black),
-        const SizedBox(height: 2), // 🔥 FIX
+        const SizedBox(height: 2),
         Text(label),
       ],
     );
   }
 }
 
-/// 📊 STAT CARD (FIXED)
+/// STAT CARD
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
@@ -210,7 +236,7 @@ class _StatCard extends StatelessWidget {
         border: Border.all(color: Colors.green),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min, // 🔥 FIX
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(title, textAlign: TextAlign.center),
           const SizedBox(height: 4),
@@ -224,7 +250,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// 📋 TASK CARD (FIXED)
+/// TASK CARD
 class _TaskCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -249,7 +275,7 @@ class _TaskCard extends StatelessWidget {
         border: Border.all(color: Colors.green),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min, // 🔥 FIX
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -259,12 +285,6 @@ class _TaskCard extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: warning ? Colors.orange : Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
               onPressed: () {},
               child: Text(button),
             ),
