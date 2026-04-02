@@ -9,17 +9,17 @@ class FarmerDashboard extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[200],
 
-      /// 🔵 FLOATING BUTTON (SCAN FIXED)
+      /// FLOATING BUTTON
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.blue,
         onPressed: () {
-          context.push('/scan'); // ✅ FIXED
+          context.push('/scan');
         },
         child: const Icon(Icons.qr_code),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
-      /// 🔻 BOTTOM NAV
+      /// BOTTOM NAV
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         child: Padding(
@@ -29,21 +29,20 @@ class FarmerDashboard extends StatelessWidget {
             children: [
               _navItem(Icons.home, "Home", isActive: true),
 
-              /// 🌳 MY TREES
               InkWell(
-                onTap: () => context.push('/my-trees'), // ✅ FIXED
+                onTap: () => context.push('/my-trees'),
                 child: _navItem(Icons.park, "My Trees"),
               ),
 
               const SizedBox(width: 40),
 
               InkWell(
-                onTap: () => context.push('/report'), // 🔥 IMPORTANT
+                onTap: () => context.push('/report'),
                 child: _navItem(Icons.insert_chart, "Report"),
               ),
-              /// 👤 PROFILE (BOTTOM)
+
               InkWell(
-                onTap: () => context.push('/profile'), // ✅ FIXED
+                onTap: () => context.push('/profile'),
                 child: _navItem(Icons.person, "Profile"),
               ),
             ],
@@ -51,14 +50,14 @@ class FarmerDashboard extends StatelessWidget {
         ),
       ),
 
-      /// 🔥 BODY
+      /// BODY
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
+
                 /// HEADER
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -81,20 +80,10 @@ class FarmerDashboard extends StatelessWidget {
                       ],
                     ),
 
-                    /// 🔔 + PROFILE (TOP)
                     Row(
                       children: [
                         const Icon(Icons.notifications),
                         const SizedBox(width: 10),
-
-                        InkWell(
-                          onTap: () => context.push('/profile'), // ✅ FIXED
-                          child: CircleAvatar(
-                            radius: 16,
-                            backgroundColor: Colors.grey[300],
-                            child: const Icon(Icons.person, color: Colors.black),
-                          ),
-                        ),
                       ],
                     ),
                   ],
@@ -110,9 +99,8 @@ class FarmerDashboard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.green),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
+                  child: const Column(
+                    children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -144,19 +132,37 @@ class FarmerDashboard extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                /// STATS
+                /// 🔥 CLICKABLE STATS
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    _StatCard(title: "My Trees", value: "24"),
-                    _StatCard(title: "Healthy", value: "22"),
-                    _StatCard(title: "Need Attention", value: "2", warning: true),
+                  children: [
+                    _StatCard(
+                      title: "My Trees",
+                      value: "24",
+                      onTap: () {
+                        context.push('/my-trees');
+                      },
+                    ),
+                    _StatCard(
+                      title: "Healthy",
+                      value: "22",
+                      onTap: () {
+                        context.push('/my-trees?filter=healthy');
+                      },
+                    ),
+                    _StatCard(
+                      title: "Need Attention",
+                      value: "2",
+                      warning: true,
+                      onTap: () {
+                        context.push('/my-trees?filter=attention');
+                      },
+                    ),
                   ],
                 ),
 
                 const SizedBox(height: 20),
 
-                /// TITLE
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -167,11 +173,11 @@ class FarmerDashboard extends StatelessWidget {
 
                 const SizedBox(height: 10),
 
-                /// TASK LIST
+                /// ✅ FIXED LIST (NO CONST ERROR)
                 ListView(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  children: const [
+                  children: [
                     _TaskCard(
                       title: "Scan Tree #14 - jackfruit #A001",
                       subtitle: "Verify fruit growth stage",
@@ -190,8 +196,6 @@ class FarmerDashboard extends StatelessWidget {
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -200,7 +204,6 @@ class FarmerDashboard extends StatelessWidget {
     );
   }
 
-  /// NAV ITEM
   Widget _navItem(IconData icon, String label, {bool isActive = false}) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -213,38 +216,46 @@ class FarmerDashboard extends StatelessWidget {
   }
 }
 
-/// STAT CARD
+/// 🔥 CLICKABLE STAT CARD
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
   final bool warning;
+  final VoidCallback? onTap;
 
   const _StatCard({
     required this.title,
     required this.value,
     this.warning = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 105,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: warning ? const Color(0xFFEED9B7) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(title, textAlign: TextAlign.center),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-        ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 105,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: warning ? const Color(0xFFEED9B7) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green),
+        ),
+        child: Column(
+          children: [
+            Text(title, textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -275,7 +286,6 @@ class _TaskCard extends StatelessWidget {
         border: Border.all(color: Colors.green),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),

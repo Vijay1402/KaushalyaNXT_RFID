@@ -11,18 +11,77 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
 
-      /// 🔥 FIXED APPBAR (BACK BUTTON ADDED)
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            context.pop(); // ✅ BACK WORKS
+            context.pop();
           },
         ),
         title: const Text("Profile"),
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
+
+        actions: [
+          PopupMenuButton<int>(
+            icon: const Icon(Icons.settings),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 1,
+                child: ListTile(
+                  leading: Icon(Icons.notifications_none),
+                  title: Text("Notification Settings"),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 2,
+                child: ListTile(
+                  leading: Icon(Icons.help_outline),
+                  title: Text("FAQs"),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 3,
+                child: ListTile(
+                  leading: Icon(Icons.support_agent),
+                  title: Text("Support"),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 4,
+                child: ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text("About App"),
+                ),
+              ),
+            ],
+
+            /// ✅ ONLY CHANGE (NAVIGATION ADDED)
+            onSelected: (value) {
+              switch (value) {
+                case 1:
+                  context.push('/notification-settings');
+                  break;
+
+                case 2:
+                  context.push('/faq');
+                  break;
+
+                case 3:
+                  context.push('/support');
+                  break;
+
+                case 4:
+                  showAboutAppDialog(context);
+                  break;
+              }
+            },
+          ),
+        ],
       ),
 
       body: SingleChildScrollView(
@@ -42,7 +101,6 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// 🌿 PROFILE HEADER
   Widget _buildProfileHeader() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -83,7 +141,6 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// 📄 PERSONAL INFO
   Widget _buildInfoCard() {
     return _card(
       title: "Personal Information",
@@ -95,7 +152,6 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// 🌾 FARM DETAILS
   Widget _buildFarmDetails() {
     return _card(
       title: "Farm Details",
@@ -108,11 +164,9 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// 🔘 ACTIONS (EDIT + LOGOUT)
   Widget _buildActions(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
-        /// EDIT PROFILE
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
@@ -130,10 +184,8 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
         ),
-
         const SizedBox(height: 10),
 
-        /// LOGOUT
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
@@ -151,7 +203,6 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// 🚨 LOGOUT DIALOG
   void _confirmLogout(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
@@ -182,11 +233,12 @@ class ProfileScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(context);
 
-              await ref.read(authStateProvider.notifier).logout();
+              final notifier = ref.read(authStateProvider.notifier);
+              await notifier.logout();
 
-              if (context.mounted) {
-                context.go('/login'); // ✅ redirect to login
-              }
+              if (!context.mounted) return;
+
+              context.go('/login');
             },
             child: const Text("Logout"),
           ),
@@ -195,7 +247,6 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// 📦 CARD UI
   Widget _card({required String title, required List<Widget> children}) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -222,7 +273,6 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-/// 📌 INFO ROW
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -250,4 +300,73 @@ class _InfoRow extends StatelessWidget {
       ),
     );
   }
+}
+void showAboutAppDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              /// TITLE
+              const Text(
+                "Agri App",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 5),
+
+              /// VERSION
+              const Text(
+                "1.0",
+                style: TextStyle(color: Colors.grey),
+              ),
+
+              const SizedBox(height: 20),
+
+              /// DESCRIPTION
+              const Text(
+                "Helping farmers digitally 🌱",
+                style: TextStyle(fontSize: 16),
+              ),
+
+              const SizedBox(height: 30),
+
+              /// BUTTONS
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      showLicensePage(
+                        context: context,
+                        applicationName: "Agri App",
+                        applicationVersion: "1.0",
+                      );
+                    },
+                    child: const Text("View licenses"),
+                  ),
+
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Close"),
+                  ),
+                ],
+              )
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }

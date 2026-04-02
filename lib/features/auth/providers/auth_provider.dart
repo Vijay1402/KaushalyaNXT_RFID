@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ ADD THIS
 import '../../../core/services/auth_service.dart';
 import '../../../data/models/user_model.dart';
 
@@ -65,8 +66,23 @@ class AuthController extends StateNotifier<AuthState> {
           await ref.read(authServiceProvider).login(email, password);
 
       state = AuthState(user: user, isLoading: false);
-    } catch (e) {
+    } on FirebaseAuthException catch (e) { // ✅ ADD THIS BLOCK
       state = state.copyWith(isLoading: false);
+      throw e; // ✅ pass exact firebase error
+    } catch (e) { // ✅ MODIFY ONLY THIS PART
+      state = state.copyWith(isLoading: false);
+
+      /// 🔥 fallback mapping (if service didn't throw properly)
+      if (e.toString().contains("user-not-found")) {
+        throw FirebaseAuthException(code: "user-not-found");
+      } else if (e.toString().contains("wrong-password")) {
+        throw FirebaseAuthException(code: "wrong-password");
+      } else if (e.toString().contains("invalid-email")) {
+        throw FirebaseAuthException(code: "invalid-email");
+      } else if (e.toString().contains("invalid-credential")) {
+        throw FirebaseAuthException(code: "invalid-credential");
+      }
+
       rethrow;
     }
   }

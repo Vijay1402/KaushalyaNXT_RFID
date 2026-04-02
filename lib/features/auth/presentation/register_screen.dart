@@ -23,6 +23,17 @@ class _RegisterScreenState
 
   String role = "farmer";
 
+  /// 🔴 ERROR VARIABLES
+  String? emailError;
+  String? passwordError;
+  String? confirmError;
+
+  bool isValidEmail(String email) {
+    return RegExp(
+            r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$")
+        .hasMatch(email);
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
@@ -37,7 +48,6 @@ class _RegisterScreenState
             children: [
               const SizedBox(height: 20),
 
-              /// HEADER
               const Text(
                 "Create Account",
                 style: TextStyle(
@@ -49,7 +59,6 @@ class _RegisterScreenState
 
               const SizedBox(height: 25),
 
-              /// CARD CONTAINER
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -61,13 +70,16 @@ class _RegisterScreenState
                 ),
                 child: Column(
                   children: [
-                    /// NAME
                     _inputField(nameController, "Full Name"),
 
                     const SizedBox(height: 15),
 
                     /// EMAIL
-                    _inputField(emailController, "Email Address"),
+                    _inputField(
+                      emailController,
+                      "Email Address",
+                      errorText: emailError,
+                    ),
 
                     const SizedBox(height: 15),
 
@@ -80,6 +92,7 @@ class _RegisterScreenState
                       onToggle: () => setState(
                         () => obscurePassword = !obscurePassword,
                       ),
+                      errorText: passwordError,
                     ),
 
                     const SizedBox(height: 15),
@@ -93,11 +106,12 @@ class _RegisterScreenState
                       onToggle: () => setState(
                         () => obscureConfirm = !obscureConfirm,
                       ),
+                      errorText: confirmError,
                     ),
 
                     const SizedBox(height: 15),
 
-                    /// ROLE DROPDOWN
+                    /// ROLE
                     Container(
                       padding:
                           const EdgeInsets.symmetric(horizontal: 12),
@@ -131,7 +145,7 @@ class _RegisterScreenState
 
               const SizedBox(height: 25),
 
-              /// REGISTER BUTTON
+              /// BUTTON
               authState.isLoading
                   ? const CircularProgressIndicator()
                   : SizedBox(
@@ -149,39 +163,56 @@ class _RegisterScreenState
                           final messenger =
                               ScaffoldMessenger.of(context);
 
-                          /// VALIDATION
-                          if (nameController.text.isEmpty ||
-                              emailController.text.isEmpty ||
-                              passwordController.text.isEmpty ||
-                              confirmPasswordController
-                                  .text.isEmpty) {
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text("Fill all fields")),
-                            );
-                            return;
+                          final email =
+                              emailController.text.trim();
+                          final password =
+                              passwordController.text.trim();
+                          final confirm =
+                              confirmPasswordController.text.trim();
+
+                          /// RESET ERRORS
+                          setState(() {
+                            emailError = null;
+                            passwordError = null;
+                            confirmError = null;
+                          });
+
+                          bool isValid = true;
+
+                          /// EMAIL VALIDATION
+                          if (email.isEmpty) {
+                            emailError = "Email is required";
+                            isValid = false;
+                          } else if (!isValidEmail(email)) {
+                            emailError = "Enter valid email";
+                            isValid = false;
                           }
 
-                          if (passwordController.text !=
-                              confirmPasswordController.text) {
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                  content: Text(
-                                      "Passwords do not match")),
-                            );
-                            return;
+                          /// PASSWORD VALIDATION
+                          if (password.length < 6) {
+                            passwordError =
+                                "Minimum 6 characters required";
+                            isValid = false;
                           }
+
+                          /// CONFIRM PASSWORD
+                          if (password != confirm) {
+                            confirmError =
+                                "Passwords do not match";
+                            isValid = false;
+                          }
+
+                          setState(() {});
+
+                          if (!isValid) return;
 
                           try {
                             await ref
                                 .read(authStateProvider.notifier)
                                 .register(
                                   name: nameController.text.trim(),
-                                  email:
-                                      emailController.text.trim(),
-                                  password:
-                                      passwordController.text.trim(),
+                                  email: email,
+                                  password: password,
                                   role: role,
                                 );
 
@@ -195,8 +226,6 @@ class _RegisterScreenState
 
                             context.go('/login');
                           } catch (e) {
-                            if (!mounted) return;
-
                             messenger.showSnackBar(
                               SnackBar(
                                   content: Text(e.toString())),
@@ -213,7 +242,6 @@ class _RegisterScreenState
 
               const SizedBox(height: 20),
 
-              /// LOGIN NAV
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -237,35 +265,54 @@ class _RegisterScreenState
     );
   }
 
-  /// INPUT FIELD (same UI)
+  /// INPUT FIELD WITH ERROR
   Widget _inputField(
     TextEditingController controller,
     String hint, {
     bool isPassword = false,
     bool obscure = false,
     VoidCallback? onToggle,
+    String? errorText,
   }) {
-    return TextField(
-      controller: controller,
-      obscureText: obscure,
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: Colors.grey[100],
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: controller,
+          obscureText: obscure,
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: Colors.grey[100],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            prefixIcon:
+                isPassword ? const Icon(Icons.lock_outline) : null,
+            suffixIcon: isPassword
+                ? IconButton(
+                    icon: Icon(obscure
+                        ? Icons.visibility_off
+                        : Icons.visibility),
+                    onPressed: onToggle,
+                  )
+                : null,
+          ),
         ),
-        prefixIcon:
-            isPassword ? const Icon(Icons.lock_outline) : null,
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(
-                    obscure ? Icons.visibility_off : Icons.visibility),
-                onPressed: onToggle,
-              )
-            : null,
-      ),
+
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 5, left: 5),
+            child: Text(
+              errorText,
+              style: const TextStyle(
+                color: Colors.red,
+                fontSize: 12,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
