@@ -1,11 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../tree_details/tree_controller.dart';
 
-class FarmerDashboard extends StatelessWidget {
+class FarmerDashboard extends ConsumerWidget {
   const FarmerDashboard({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authStateProvider).user;
+    final treesAsync = ref.watch(treesProvider);
+    final userName =
+        (user?.name.trim().isNotEmpty ?? false) ? user!.name.trim() : 'Farmer';
+    final stats = treesAsync.when(
+      data: (trees) {
+        final total = trees.length;
+        final healthy = trees.where((tree) {
+          final health = (tree['healthStatus'] ?? '').toString();
+          return health == '0';
+        }).length;
+        final needAttention = trees.where((tree) {
+          final health = (tree['healthStatus'] ?? '').toString();
+          return health == '1';
+        }).length;
+
+        return (
+          total: total.toString(),
+          healthy: healthy.toString(),
+          needAttention: needAttention.toString(),
+        );
+      },
+      loading: () => (total: '...', healthy: '...', needAttention: '...'),
+      error: (_, __) => (total: '-', healthy: '-', needAttention: '-'),
+    );
+
     return Scaffold(
       backgroundColor: Colors.grey[200],
 
@@ -28,19 +57,15 @@ class FarmerDashboard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _navItem(Icons.home, "Home", isActive: true),
-
               InkWell(
                 onTap: () => context.push('/my-trees'),
                 child: _navItem(Icons.park, "My Trees"),
               ),
-
               const SizedBox(width: 40),
-
               InkWell(
                 onTap: () => context.push('/report'),
                 child: _navItem(Icons.insert_chart, "Report"),
               ),
-
               InkWell(
                 onTap: () => context.push('/profile'),
                 child: _navItem(Icons.person, "Profile"),
@@ -57,21 +82,20 @@ class FarmerDashboard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-
                 /// HEADER
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
-                      children: const [
+                      children: [
                         CircleAvatar(
                           backgroundColor: Colors.green,
                           child: Icon(Icons.agriculture, color: Colors.white),
                         ),
                         SizedBox(width: 10),
                         Text(
-                          "Namaste, Farmer!",
-                          style: TextStyle(
+                          "Namaste, $userName!",
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
                             color: Colors.green,
@@ -79,7 +103,6 @@ class FarmerDashboard extends StatelessWidget {
                         ),
                       ],
                     ),
-
                     Row(
                       children: [
                         const Icon(Icons.notifications),
@@ -107,7 +130,8 @@ class FarmerDashboard extends StatelessWidget {
                           Text("SYNC STATUS PANEL"),
                           Row(
                             children: [
-                              CircleAvatar(radius: 5, backgroundColor: Colors.green),
+                              CircleAvatar(
+                                  radius: 5, backgroundColor: Colors.green),
                               SizedBox(width: 5),
                               Text("ONLINE"),
                             ],
@@ -138,21 +162,21 @@ class FarmerDashboard extends StatelessWidget {
                   children: [
                     _StatCard(
                       title: "My Trees",
-                      value: "24",
+                      value: stats.total,
                       onTap: () {
                         context.push('/my-trees');
                       },
                     ),
                     _StatCard(
                       title: "Healthy",
-                      value: "22",
+                      value: stats.healthy,
                       onTap: () {
                         context.push('/my-trees?filter=healthy');
                       },
                     ),
                     _StatCard(
                       title: "Need Attention",
-                      value: "2",
+                      value: stats.needAttention,
                       warning: true,
                       onTap: () {
                         context.push('/my-trees?filter=attention');

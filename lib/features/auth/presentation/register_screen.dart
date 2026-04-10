@@ -7,12 +7,10 @@ class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  ConsumerState<RegisterScreen> createState() =>
-      _RegisterScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState
-    extends ConsumerState<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -29,9 +27,7 @@ class _RegisterScreenState
   String? confirmError;
 
   bool isValidEmail(String email) {
-    return RegExp(
-            r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$")
-        .hasMatch(email);
+    return RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$").hasMatch(email);
   }
 
   @override
@@ -42,8 +38,7 @@ class _RegisterScreenState
       backgroundColor: Colors.grey[200],
       body: SafeArea(
         child: SingleChildScrollView(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             children: [
               const SizedBox(height: 20),
@@ -113,11 +108,9 @@ class _RegisterScreenState
 
                     /// ROLE
                     Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
-                        border:
-                            Border.all(color: Colors.grey.shade300),
+                        border: Border.all(color: Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: DropdownButton<String>(
@@ -126,11 +119,8 @@ class _RegisterScreenState
                         underline: const SizedBox(),
                         items: const [
                           DropdownMenuItem(
-                              value: "farmer",
-                              child: Text("Farmer")),
-                          DropdownMenuItem(
-                              value: "kvk",
-                              child: Text("KVK")),
+                              value: "farmer", child: Text("Farmer")),
+                          DropdownMenuItem(value: "kvk", child: Text("KVK")),
                         ],
                         onChanged: (value) {
                           setState(() {
@@ -155,20 +145,15 @@ class _RegisterScreenState
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green[700],
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(30),
+                            borderRadius: BorderRadius.circular(30),
                           ),
                         ),
                         onPressed: () async {
-                          final messenger =
-                              ScaffoldMessenger.of(context);
+                          final messenger = ScaffoldMessenger.of(context);
 
-                          final email =
-                              emailController.text.trim();
-                          final password =
-                              passwordController.text.trim();
-                          final confirm =
-                              confirmPasswordController.text.trim();
+                          final email = emailController.text.trim();
+                          final password = passwordController.text.trim();
+                          final confirm = confirmPasswordController.text.trim();
 
                           /// RESET ERRORS
                           setState(() {
@@ -190,15 +175,13 @@ class _RegisterScreenState
 
                           /// PASSWORD VALIDATION
                           if (password.length < 6) {
-                            passwordError =
-                                "Minimum 6 characters required";
+                            passwordError = "Minimum 6 characters required";
                             isValid = false;
                           }
 
                           /// CONFIRM PASSWORD
                           if (password != confirm) {
-                            confirmError =
-                                "Passwords do not match";
+                            confirmError = "Passwords do not match";
                             isValid = false;
                           }
 
@@ -207,9 +190,7 @@ class _RegisterScreenState
                           if (!isValid) return;
 
                           try {
-                            await ref
-                                .read(authStateProvider.notifier)
-                                .register(
+                            await ref.read(authStateProvider.notifier).register(
                                   name: nameController.text.trim(),
                                   email: email,
                                   password: password,
@@ -220,22 +201,19 @@ class _RegisterScreenState
 
                             messenger.showSnackBar(
                               const SnackBar(
-                                  content: Text(
-                                      "Registered Successfully")),
+                                  content: Text("Registered Successfully")),
                             );
 
-                            context.go('/login');
+                            context.go('/farmer');
                           } catch (e) {
                             messenger.showSnackBar(
-                              SnackBar(
-                                  content: Text(e.toString())),
+                              SnackBar(content: Text(e.toString())),
                             );
                           }
                         },
                         child: const Text(
                           "SIGN UP",
-                          style:
-                              TextStyle(color: Colors.white),
+                          style: TextStyle(color: Colors.white),
                         ),
                       ),
                     ),
@@ -288,19 +266,16 @@ class _RegisterScreenState
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
             ),
-            prefixIcon:
-                isPassword ? const Icon(Icons.lock_outline) : null,
+            prefixIcon: isPassword ? const Icon(Icons.lock_outline) : null,
             suffixIcon: isPassword
                 ? IconButton(
-                    icon: Icon(obscure
-                        ? Icons.visibility_off
-                        : Icons.visibility),
+                    icon:
+                        Icon(obscure ? Icons.visibility_off : Icons.visibility),
                     onPressed: onToggle,
                   )
                 : null,
           ),
         ),
-
         if (errorText != null)
           Padding(
             padding: const EdgeInsets.only(top: 5, left: 5),

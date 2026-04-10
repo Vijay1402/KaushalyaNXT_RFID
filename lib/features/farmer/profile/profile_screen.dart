@@ -8,9 +8,16 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authStateProvider).user;
+    final userName =
+        (user?.name.trim().isNotEmpty ?? false) ? user!.name.trim() : "Farmer";
+    final userEmail =
+        (user?.email.trim().isNotEmpty ?? false) ? user!.email.trim() : "-";
+    final userRole =
+        (user?.role.trim().isNotEmpty ?? false) ? user!.role.trim() : "farmer";
+
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -22,7 +29,6 @@ class ProfileScreen extends ConsumerWidget {
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
-
         actions: [
           PopupMenuButton<int>(
             icon: const Icon(Icons.settings),
@@ -58,6 +64,13 @@ class ProfileScreen extends ConsumerWidget {
                   title: Text("About App"),
                 ),
               ),
+              const PopupMenuItem(
+                value: 5,
+                child: ListTile(
+                  leading: Icon(Icons.storage),
+                  title: Text("Local Storage"),
+                ),
+              ),
             ],
 
             /// ✅ ONLY CHANGE (NAVIGATION ADDED)
@@ -78,19 +91,22 @@ class ProfileScreen extends ConsumerWidget {
                 case 4:
                   showAboutAppDialog(context);
                   break;
+
+                case 5:
+                  context.push('/local-storage');
+                  break;
               }
             },
           ),
         ],
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _buildProfileHeader(),
+            _buildProfileHeader(userName, userRole),
             const SizedBox(height: 20),
-            _buildInfoCard(),
+            _buildInfoCard(userEmail),
             const SizedBox(height: 20),
             _buildFarmDetails(),
             const SizedBox(height: 20),
@@ -101,7 +117,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(String userName, String userRole) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -111,7 +127,7 @@ class ProfileScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
-        children: const [
+        children: [
           CircleAvatar(
             radius: 35,
             backgroundColor: Colors.white,
@@ -122,8 +138,8 @@ class ProfileScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Farmer Rajesh",
-                style: TextStyle(
+                userName,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -131,8 +147,8 @@ class ProfileScreen extends ConsumerWidget {
               ),
               SizedBox(height: 4),
               Text(
-                "Organic Farmer",
-                style: TextStyle(color: Colors.white70),
+                userRole[0].toUpperCase() + userRole.substring(1),
+                style: const TextStyle(color: Colors.white70),
               ),
             ],
           ),
@@ -141,13 +157,16 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildInfoCard() {
+  Widget _buildInfoCard(String userEmail) {
     return _card(
       title: "Personal Information",
-      children: const [
+      children: [
         _InfoRow(icon: Icons.phone, label: "Phone", value: "+91 9876543210"),
-        _InfoRow(icon: Icons.location_on, label: "Location", value: "Karnataka, India"),
-        _InfoRow(icon: Icons.email, label: "Email", value: "farmer@gmail.com"),
+        _InfoRow(
+            icon: Icons.location_on,
+            label: "Location",
+            value: "Karnataka, India"),
+        _InfoRow(icon: Icons.email, label: "Email", value: userEmail),
       ],
     );
   }
@@ -159,7 +178,10 @@ class ProfileScreen extends ConsumerWidget {
         _InfoRow(icon: Icons.landscape, label: "Land Size", value: "5 Acres"),
         _InfoRow(icon: Icons.park, label: "Total Trees", value: "120"),
         _InfoRow(icon: Icons.eco, label: "Main Crops", value: "Mango, Coconut"),
-        _InfoRow(icon: Icons.water_drop, label: "Irrigation", value: "Drip Irrigation"),
+        _InfoRow(
+            icon: Icons.water_drop,
+            label: "Irrigation",
+            value: "Drip Irrigation"),
       ],
     );
   }
@@ -185,7 +207,6 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 10),
-
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
@@ -264,7 +285,8 @@ class ProfileScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           ...children,
         ],
@@ -301,6 +323,7 @@ class _InfoRow extends StatelessWidget {
     );
   }
 }
+
 void showAboutAppDialog(BuildContext context) {
   showDialog(
     context: context,
@@ -356,7 +379,6 @@ void showAboutAppDialog(BuildContext context) {
                     },
                     child: const Text("View licenses"),
                   ),
-
                   TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: const Text("Close"),

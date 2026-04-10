@@ -5,6 +5,7 @@ import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
+import '../../features/auth/presentation/local_storage_viewer_screen.dart';
 import '../../features/farmer/dashboard/farmer_dashboard.dart';
 import '../../features/farmer/my_trees/my_trees_screen.dart';
 import '../../features/farmer/profile/profile_screen.dart';
@@ -21,33 +22,26 @@ GoRouter createRouter(Ref ref) {
 
   return GoRouter(
     initialLocation: RoutePaths.login,
-
     redirect: (context, state) {
       final loggedIn = authState.user != null;
       final location = state.matchedLocation;
 
       final isLogin = location == RoutePaths.login;
       final isRegister = location == RoutePaths.register;
-      final isForgotPassword =
-          location == RoutePaths.forgotPassword;
+      final isForgotPassword = location == RoutePaths.forgotPassword;
 
       /// ❌ NOT LOGGED IN → allow only auth screens
-      if (!loggedIn &&
-          !isLogin &&
-          !isRegister &&
-          !isForgotPassword) {
+      if (!loggedIn && !isLogin && !isRegister && !isForgotPassword) {
         return RoutePaths.login;
       }
 
       /// ❌ LOGGED IN → prevent going back to auth screens
-      if (loggedIn &&
-          (isLogin || isRegister || isForgotPassword)) {
+      if (loggedIn && (isLogin || isRegister || isForgotPassword)) {
         return RoutePaths.farmerHome;
       }
 
       return null;
     },
-
     routes: [
       /// LOGIN
       GoRoute(
@@ -64,8 +58,7 @@ GoRouter createRouter(Ref ref) {
       /// FORGOT PASSWORD ✅
       GoRoute(
         path: RoutePaths.forgotPassword,
-        builder: (context, state) =>
-            const ForgotPasswordScreen(),
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
       /// DASHBOARD
@@ -89,29 +82,32 @@ GoRouter createRouter(Ref ref) {
 
       GoRoute(
         path: '/notification-settings',
-        builder: (context, state) =>const NotificationSettingsScreen(),
+        builder: (context, state) => const NotificationSettingsScreen(),
       ),
-      
+
+      GoRoute(
+        path: '/local-storage',
+        builder: (context, state) => const LocalStorageViewerScreen(),
+      ),
+
       GoRoute(
         path: '/faq',
         builder: (context, state) => const FAQScreen(),
-      ),// SCAN
+      ), // SCAN
 
       GoRoute(
         path: '/support',
         builder: (context, state) => const SupportScreen(),
       ),
       GoRoute(
-        path: '/scan',  
-        builder: (context, state) =>
-            const RFIDScanScreen(),
+        path: '/scan',
+        builder: (context, state) => const RFIDScanScreen(),
       ),
 
       /// REPORT
       GoRoute(
         path: '/report',
-        builder: (context, state) =>
-            const ReportsScreen(),
+        builder: (context, state) => const ReportsScreen(),
       ),
 
       /// TREE DETAILS

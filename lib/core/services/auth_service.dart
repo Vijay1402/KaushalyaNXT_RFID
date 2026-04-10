@@ -23,8 +23,7 @@ class AuthService {
       final user = credential.user;
       if (user == null) throw Exception("Login failed");
 
-      final doc =
-          await firestore.collection('users').doc(user.uid).get();
+      final doc = await firestore.collection('users').doc(user.uid).get();
 
       if (!doc.exists) {
         throw Exception("User data not found in database");
@@ -58,6 +57,8 @@ class AuthService {
       final user = credential.user;
       if (user == null) throw Exception("Registration failed");
 
+      await user.updateDisplayName(name);
+
       await firestore.collection('users').doc(user.uid).set({
         'name': name,
         'email': email,
@@ -90,14 +91,16 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential =
-          await _auth.signInWithCredential(credential);
+      final userCredential = await _auth.signInWithCredential(credential);
 
       final user = userCredential.user;
       if (user == null) throw Exception("Google login failed");
 
-      final doc =
-          await firestore.collection('users').doc(user.uid).get();
+      if ((user.displayName ?? '').trim().isNotEmpty) {
+        await user.updateDisplayName(user.displayName!.trim());
+      }
+
+      final doc = await firestore.collection('users').doc(user.uid).get();
 
       if (!doc.exists) {
         await firestore.collection('users').doc(user.uid).set({

@@ -17,10 +17,10 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen>
     with TickerProviderStateMixin {
-
   // ── Filter state ───────────────────────────────────────────
-  String? _selectedSpecies;   // null = all species
-  String? _selectedHealth;    // null = all | 'Healthy' | 'Unhealthy' | 'Recovering'
+  String? _selectedSpecies; // null = all species
+  String?
+      _selectedHealth; // null = all | 'Healthy' | 'Unhealthy' | 'Recovering'
 
   // ── Species options (replace with your real ones later) ────
   final List<String> _allSpecies = [
@@ -38,20 +38,20 @@ class _ReportsScreenState extends State<ReportsScreen>
   late AnimationController _pieCtrl;
   late AnimationController _ageBarCtrl;
   late AnimationController _weekBarCtrl;
-  late Animation<double>   _pieAnim;
-  late Animation<double>   _ageBarAnim;
-  late Animation<double>   _weekBarAnim;
+  late Animation<double> _pieAnim;
+  late Animation<double> _ageBarAnim;
+  late Animation<double> _weekBarAnim;
 
   // ── Colours ────────────────────────────────────────────────
-  static const _dark    = Color(0xFF1A2E1C);
-  static const _green1  = Color(0xFF1E4D2B);
-  static const _green2  = Color(0xFF2D6A3F);
-  static const _green3  = Color(0xFF4E9B64);
-  static const _green4  = Color(0xFFA5D6A7);
-  static const _green5  = Color(0xFFC8E6C9);
-  static const _orange  = Color(0xFFE07B2A);
-  static const _bg      = Color(0xFFF7F5F0);
-  static const _sub     = Color(0xFF8FAF96);
+  static const _dark = Color(0xFF1A2E1C);
+  static const _green1 = Color(0xFF1E4D2B);
+  static const _green2 = Color(0xFF2D6A3F);
+  static const _green3 = Color(0xFF4E9B64);
+  static const _green4 = Color(0xFFA5D6A7);
+  static const _green5 = Color(0xFFC8E6C9);
+  static const _orange = Color(0xFFE07B2A);
+  static const _bg = Color(0xFFF7F5F0);
+  static const _sub = Color(0xFF8FAF96);
 
   // ── Filtered tree list (recomputed on every filter change) ─
   List<Tree> get _filtered {
@@ -72,7 +72,8 @@ class _ReportsScreenState extends State<ReportsScreen>
                 t.currentStatus != TreeHealthStatus.sick) return false;
             break;
           case 'Recovering':
-            if (t.currentStatus != TreeHealthStatus.needsAttention) return false;
+            if (t.currentStatus != TreeHealthStatus.needsAttention)
+              return false;
             break;
         }
       }
@@ -95,21 +96,29 @@ class _ReportsScreenState extends State<ReportsScreen>
     _weekBarCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 850));
 
-    _pieAnim     = CurvedAnimation(parent: _pieCtrl,     curve: Curves.easeOutCubic);
-    _ageBarAnim  = CurvedAnimation(parent: _ageBarCtrl,  curve: Curves.easeOutCubic);
-    _weekBarAnim = CurvedAnimation(parent: _weekBarCtrl, curve: Curves.easeOutCubic);
+    _pieAnim = CurvedAnimation(parent: _pieCtrl, curve: Curves.easeOutCubic);
+    _ageBarAnim =
+        CurvedAnimation(parent: _ageBarCtrl, curve: Curves.easeOutCubic);
+    _weekBarAnim =
+        CurvedAnimation(parent: _weekBarCtrl, curve: Curves.easeOutCubic);
   }
 
   void _runAnimations() {
     _pieCtrl.forward(from: 0);
-    Future.delayed(const Duration(milliseconds: 120),
-        () { if (mounted) _ageBarCtrl.forward(from: 0); });
-    Future.delayed(const Duration(milliseconds: 240),
-        () { if (mounted) _weekBarCtrl.forward(from: 0); });
+    Future.delayed(const Duration(milliseconds: 120), () {
+      if (mounted) _ageBarCtrl.forward(from: 0);
+    });
+    Future.delayed(const Duration(milliseconds: 240), () {
+      if (mounted) _weekBarCtrl.forward(from: 0);
+    });
   }
 
   // Called whenever a filter changes — resets & reruns animations
-  void _applyFilter({String? species, String? health, bool clearSpecies = false, bool clearHealth = false}) {
+  void _applyFilter(
+      {String? species,
+      String? health,
+      bool clearSpecies = false,
+      bool clearHealth = false}) {
     setState(() {
       if (clearSpecies) {
         _selectedSpecies = null;
@@ -141,31 +150,40 @@ class _ReportsScreenState extends State<ReportsScreen>
     final trees = _filtered;
 
     // ── Computed stats from filtered list ──────────────────────
-    final total        = trees.length;
-    final healthy      = trees.where((t) => t.currentStatus == TreeHealthStatus.healthy).length;
-    final unhealthy    = trees.where((t) =>
-        t.currentStatus == TreeHealthStatus.atRisk ||
-        t.currentStatus == TreeHealthStatus.sick).length;
-    final recovering   = trees.where((t) =>
-        t.currentStatus == TreeHealthStatus.needsAttention).length;
+    final total = trees.length;
+    final healthy =
+        trees.where((t) => t.currentStatus == TreeHealthStatus.healthy).length;
+    final unhealthy = trees
+        .where((t) =>
+            t.currentStatus == TreeHealthStatus.atRisk ||
+            t.currentStatus == TreeHealthStatus.sick)
+        .length;
+    final recovering = trees
+        .where((t) => t.currentStatus == TreeHealthStatus.needsAttention)
+        .length;
 
-    final now          = DateTime.now();
-    final age0to1      = trees.where((t) => now.difference(t.plantingDate).inDays < 365).length;
-    final age1to5      = trees.where((t) {
+    final now = DateTime.now();
+    final age0to1 =
+        trees.where((t) => now.difference(t.plantingDate).inDays < 365).length;
+    final age1to5 = trees.where((t) {
       final d = now.difference(t.plantingDate).inDays;
       return d >= 365 && d < 365 * 5;
     }).length;
-    final age5plus     = trees.where((t) => now.difference(t.plantingDate).inDays >= 365 * 5).length;
+    final age5plus = trees
+        .where((t) => now.difference(t.plantingDate).inDays >= 365 * 5)
+        .length;
 
-    final totalYield   = trees.fold<double>(0, (s, t) => s + (t.maintenanceRecords.length * 48.0 + 50));
-    final avgYield     = total > 0 ? totalYield / total : 0.0;
-    final sortedYield  = [...trees]..sort((a, b) =>
+    final totalYield = trees.fold<double>(
+        0, (s, t) => s + (t.maintenanceRecords.length * 48.0 + 50));
+    final avgYield = total > 0 ? totalYield / total : 0.0;
+    final sortedYield = [...trees]..sort((a, b) =>
         b.maintenanceRecords.length.compareTo(a.maintenanceRecords.length));
-    final topTree      = sortedYield.isNotEmpty ? sortedYield.first : null;
-    final topYieldKg   = topTree != null ? (topTree.maintenanceRecords.length * 48.0 + 50) : 0.0;
+    final topTree = sortedYield.isNotEmpty ? sortedYield.first : null;
+    final topYieldKg =
+        topTree != null ? (topTree.maintenanceRecords.length * 48.0 + 50) : 0.0;
 
-    final base         = math.max(total, 1);
-    final weekCounts   = [
+    final base = math.max(total, 1);
+    final weekCounts = [
       (base * 0.40).round(),
       (base * 0.70).round(),
       (base * 0.30).round(),
@@ -174,8 +192,8 @@ class _ReportsScreenState extends State<ReportsScreen>
       (base * 0.25).round(),
       (base * 0.15).round(),
     ];
-    final todayScans   = (base * 0.18).round().clamp(1, 999);
-    final weekScans    = weekCounts.fold(0, (a, b) => a + b);
+    final todayScans = (base * 0.18).round().clamp(1, 999);
+    final weekScans = weekCounts.fold(0, (a, b) => a + b);
 
     return Scaffold(
       backgroundColor: _bg,
@@ -191,10 +209,10 @@ class _ReportsScreenState extends State<ReportsScreen>
                 children: [
                   // ── Yield overview ────────────────────────────
                   _buildYieldOverview(
-                    total:      total,
+                    total: total,
                     totalYield: totalYield,
-                    avgYield:   avgYield,
-                    topTree:    topTree?.name ?? 'N/A',
+                    avgYield: avgYield,
+                    topTree: topTree?.name ?? 'N/A',
                     topYieldKg: topYieldKg,
                   ),
                   const SizedBox(height: 12),
@@ -206,22 +224,22 @@ class _ReportsScreenState extends State<ReportsScreen>
                       children: [
                         Expanded(
                           child: _buildHealthDistCard(
-                            total:     total,
-                            healthy:   healthy,
+                            total: total,
+                            healthy: healthy,
                             unhealthy: unhealthy,
-                            recovering:recovering,
+                            recovering: recovering,
                             todayScans: todayScans,
-                            weekScans:  weekScans,
+                            weekScans: weekScans,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: _buildAgeDistCard(
-                            age0to1:   age0to1,
-                            age1to5:   age1to5,
-                            age5plus:  age5plus,
+                            age0to1: age0to1,
+                            age1to5: age1to5,
+                            age5plus: age5plus,
                             todayScans: todayScans,
-                            weekScans:  weekScans,
+                            weekScans: weekScans,
                           ),
                         ),
                       ],
@@ -236,7 +254,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                   // ── RFID activity ─────────────────────────────
                   _buildRFIDActivityCard(
                     todayScans: todayScans,
-                    weekScans:  weekScans,
+                    weekScans: weekScans,
                   ),
                 ],
               ),
@@ -274,7 +292,8 @@ class _ReportsScreenState extends State<ReportsScreen>
             ),
           ),
           Container(
-            width: 34, height: 34,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.15),
               shape: BoxShape.circle,
@@ -298,7 +317,6 @@ class _ReportsScreenState extends State<ReportsScreen>
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-
             // ── Filters label chip (decorative) ────────────────
             _filterChip(
               label: 'Filters',
@@ -312,7 +330,8 @@ class _ReportsScreenState extends State<ReportsScreen>
             GestureDetector(
               onTap: () => _showSpeciesSheet(),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: _selectedSpecies != null ? _green1 : _bg,
                   borderRadius: BorderRadius.circular(20),
@@ -359,7 +378,8 @@ class _ReportsScreenState extends State<ReportsScreen>
             GestureDetector(
               onTap: () => _showHealthSheet(),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: _selectedHealth != null ? _green1 : _bg,
                   borderRadius: BorderRadius.circular(20),
@@ -433,8 +453,8 @@ class _ReportsScreenState extends State<ReportsScreen>
                       Navigator.pop(context);
                       _applyFilter(clearSpecies: true);
                     },
-                    child: const Text('Clear',
-                        style: TextStyle(color: _orange)),
+                    child:
+                        const Text('Clear', style: TextStyle(color: _orange)),
                   ),
               ],
             ),
@@ -476,9 +496,13 @@ class _ReportsScreenState extends State<ReportsScreen>
   // ── Health bottom sheet ─────────────────────────────────────
   void _showHealthSheet() {
     final options = [
-      {'label': 'Healthy',    'icon': Icons.favorite,      'color': _green3},
-      {'label': 'Unhealthy',  'icon': Icons.warning_amber, 'color': _orange},
-      {'label': 'Recovering', 'icon': Icons.healing,       'color': Colors.blue.shade400},
+      {'label': 'Healthy', 'icon': Icons.favorite, 'color': _green3},
+      {'label': 'Unhealthy', 'icon': Icons.warning_amber, 'color': _orange},
+      {
+        'label': 'Recovering',
+        'icon': Icons.healing,
+        'color': Colors.blue.shade400
+      },
     ];
     showModalBottomSheet(
       context: context,
@@ -505,16 +529,16 @@ class _ReportsScreenState extends State<ReportsScreen>
                       Navigator.pop(context);
                       _applyFilter(clearHealth: true);
                     },
-                    child: const Text('Clear',
-                        style: TextStyle(color: _orange)),
+                    child:
+                        const Text('Clear', style: TextStyle(color: _orange)),
                   ),
               ],
             ),
             const SizedBox(height: 12),
             ...options.map((opt) {
-              final label  = opt['label'] as String;
-              final icon   = opt['icon']  as IconData;
-              final color  = opt['color'] as Color;
+              final label = opt['label'] as String;
+              final icon = opt['icon'] as IconData;
+              final color = opt['color'] as Color;
               final active = _selectedHealth == label;
               return GestureDetector(
                 onTap: () {
@@ -523,7 +547,8 @@ class _ReportsScreenState extends State<ReportsScreen>
                 },
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: active ? color.withValues(alpha: 0.12) : _bg,
                     borderRadius: BorderRadius.circular(12),
@@ -568,8 +593,7 @@ class _ReportsScreenState extends State<ReportsScreen>
         decoration: BoxDecoration(
           color: isActive ? _green1 : _bg,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: isActive ? _green1 : Colors.grey.shade300),
+          border: Border.all(color: isActive ? _green1 : Colors.grey.shade300),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -599,7 +623,7 @@ class _ReportsScreenState extends State<ReportsScreen>
     required String topTree,
     required double topYieldKg,
   }) {
-    final totalStr  = totalYield >= 1000
+    final totalStr = totalYield >= 1000
         ? '${(totalYield / 1000).toStringAsFixed(1)}k kg'
         : '${totalYield.toStringAsFixed(0)} kg';
     final farmerStr = totalYield >= 1000
@@ -610,28 +634,34 @@ class _ReportsScreenState extends State<ReportsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle(Icons.eco_outlined, 'Yield Overview', iconColor: _green2),
+          _sectionTitle(Icons.eco_outlined, 'Yield Overview',
+              iconColor: _green2),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _yieldBox('🌿', 'Total Yield\n(All Trees)',  totalStr, _bg)),
+              Expanded(
+                  child: _yieldBox(
+                      '🌿', 'Total Yield\n(All Trees)', totalStr, _bg)),
               const SizedBox(width: 8),
-              Expanded(child: _yieldBox('🌳', 'Avg Yield\nper Tree',
-                  '${avgYield.toStringAsFixed(0)} kg', _bg)),
+              Expanded(
+                  child: _yieldBox('🌳', 'Avg Yield\nper Tree',
+                      '${avgYield.toStringAsFixed(0)} kg', _bg)),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: _yieldBox('🏆', 'Highest\nYield Tree',
-                  topTree, const Color(0xFFE8F5E9),
-                  sub: '${topYieldKg.toStringAsFixed(0)} kg',
-                  subColor: _dark)),
+              Expanded(
+                  child: _yieldBox('🏆', 'Highest\nYield Tree', topTree,
+                      const Color(0xFFE8F5E9),
+                      sub: '${topYieldKg.toStringAsFixed(0)} kg',
+                      subColor: _dark)),
               const SizedBox(width: 8),
-              Expanded(child: _yieldBox('📊', 'Farmer\nTotal Yield',
-                  farmerStr, const Color(0xFFFFF8E1),
-                  sub: '($total trees)',
-                  subColor: const Color(0xFF9A7A35))),
+              Expanded(
+                  child: _yieldBox('📊', 'Farmer\nTotal Yield', farmerStr,
+                      const Color(0xFFFFF8E1),
+                      sub: '($total trees)',
+                      subColor: const Color(0xFF9A7A35))),
             ],
           ),
         ],
@@ -643,8 +673,8 @@ class _ReportsScreenState extends State<ReportsScreen>
       {String? sub, Color? subColor}) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-          color: bg, borderRadius: BorderRadius.circular(12)),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -660,15 +690,10 @@ class _ReportsScreenState extends State<ReportsScreen>
           const SizedBox(height: 6),
           Text(value,
               style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: _dark)),
+                  fontSize: 17, fontWeight: FontWeight.w700, color: _dark)),
           if (sub != null) ...[
             const SizedBox(height: 2),
-            Text(sub,
-                style: TextStyle(
-                    fontSize: 9,
-                    color: subColor ?? _sub)),
+            Text(sub, style: TextStyle(fontSize: 9, color: subColor ?? _sub)),
           ],
         ],
       ),
@@ -694,9 +719,7 @@ class _ReportsScreenState extends State<ReportsScreen>
         children: [
           const Text('Health dist.',
               style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _dark)),
+                  fontSize: 12, fontWeight: FontWeight.w600, color: _dark)),
           const SizedBox(height: 10),
 
           // ── Donut chart ───────────────────────────────────────
@@ -706,12 +729,12 @@ class _ReportsScreenState extends State<ReportsScreen>
               builder: (_, __) => CustomPaint(
                 size: const Size(90, 90),
                 painter: _DonutPainter(
-                  healthy:   healthy,
+                  healthy: healthy,
                   unhealthy: unhealthy,
-                  recovering:recovering,
-                  total:     total,
-                  progress:  _pieAnim.value,
-                  pct:       pct,
+                  recovering: recovering,
+                  total: total,
+                  progress: _pieAnim.value,
+                  pct: pct,
                 ),
               ),
             ),
@@ -719,17 +742,17 @@ class _ReportsScreenState extends State<ReportsScreen>
           const SizedBox(height: 8),
 
           // ── Legend ────────────────────────────────────────────
-          _legend(const Color(0xFF4E9B64), 'Healthy',    healthy),
+          _legend(const Color(0xFF4E9B64), 'Healthy', healthy),
           const SizedBox(height: 4),
-          _legend(_orange,                 'Unhealthy',  unhealthy),
+          _legend(_orange, 'Unhealthy', unhealthy),
           const SizedBox(height: 4),
-          _legend(_green4,                 'Recovering', recovering),
+          _legend(_green4, 'Recovering', recovering),
           const SizedBox(height: 10),
 
           // ── Scan counts ───────────────────────────────────────
           const Divider(height: 1, color: Color(0xFFF0F0F0)),
           const SizedBox(height: 8),
-          _scanRow('Scans today',    todayScans),
+          _scanRow('Scans today', todayScans),
           const SizedBox(height: 4),
           _scanRow('Scans this week', weekScans),
         ],
@@ -741,7 +764,8 @@ class _ReportsScreenState extends State<ReportsScreen>
     return Row(
       children: [
         Container(
-            width: 8, height: 8,
+            width: 8,
+            height: 8,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 5),
         Expanded(
@@ -777,16 +801,13 @@ class _ReportsScreenState extends State<ReportsScreen>
     required int todayScans,
     required int weekScans,
   }) {
-    final maxAge = [age0to1, age1to5, age5plus]
-        .fold(0, (m, v) => v > m ? v : m);
+    final maxAge =
+        [age0to1, age1to5, age5plus].fold(0, (m, v) => v > m ? v : m);
 
     final bars = [
-      _BarData(label: '0–1', value: age0to1, maxValue: maxAge,
-          color: _green4),
-      _BarData(label: '1–5', value: age1to5, maxValue: maxAge,
-          color: _green3),
-      _BarData(label: '5+',  value: age5plus, maxValue: maxAge,
-          color: _green2),
+      _BarData(label: '0–1', value: age0to1, maxValue: maxAge, color: _green4),
+      _BarData(label: '1–5', value: age1to5, maxValue: maxAge, color: _green3),
+      _BarData(label: '5+', value: age5plus, maxValue: maxAge, color: _green2),
     ];
 
     return _card(
@@ -795,9 +816,7 @@ class _ReportsScreenState extends State<ReportsScreen>
         children: [
           const Text('Age dist.',
               style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _dark)),
+                  fontSize: 12, fontWeight: FontWeight.w600, color: _dark)),
           const SizedBox(height: 10),
 
           // ── Bar chart ─────────────────────────────────────────
@@ -807,41 +826,43 @@ class _ReportsScreenState extends State<ReportsScreen>
               animation: _ageBarAnim,
               builder: (_, __) => Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
-                children: bars.map((b) => Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text('${b.value}',
-                            style: const TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.w600,
-                                color: _dark)),
-                        const SizedBox(height: 2),
-                        AnimatedContainer(
-                          duration: Duration.zero,
-                          child: Container(
-                            width: double.infinity,
-                            height: b.maxValue == 0
-                                ? 2
-                                : (b.value / b.maxValue * 72) *
-                                    _ageBarAnim.value,
-                            decoration: BoxDecoration(
-                              color: b.color,
-                              borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(4)),
+                children: bars
+                    .map((b) => Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text('${b.value}',
+                                    style: const TextStyle(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w600,
+                                        color: _dark)),
+                                const SizedBox(height: 2),
+                                AnimatedContainer(
+                                  duration: Duration.zero,
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: b.maxValue == 0
+                                        ? 2
+                                        : (b.value / b.maxValue * 72) *
+                                            _ageBarAnim.value,
+                                    decoration: BoxDecoration(
+                                      color: b.color,
+                                      borderRadius: const BorderRadius.vertical(
+                                          top: Radius.circular(4)),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(b.label,
+                                    style: const TextStyle(
+                                        fontSize: 8, color: _sub)),
+                              ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(b.label,
-                            style: const TextStyle(
-                                fontSize: 8, color: _sub)),
-                      ],
-                    ),
-                  ),
-                )).toList(),
+                        ))
+                    .toList(),
               ),
             ),
           ),
@@ -849,7 +870,7 @@ class _ReportsScreenState extends State<ReportsScreen>
 
           const Divider(height: 1, color: Color(0xFFF0F0F0)),
           const SizedBox(height: 8),
-          _scanRow('Scans today',    todayScans),
+          _scanRow('Scans today', todayScans),
           const SizedBox(height: 4),
           _scanRow('Scans this week', weekScans),
         ],
@@ -861,9 +882,9 @@ class _ReportsScreenState extends State<ReportsScreen>
   //  WEEKLY SCAN TREND — animated bar chart
   // ─────────────────────────────────────────────────────────────
   Widget _buildWeeklyTrendCard({required List<int> weekCounts}) {
-    final days    = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final maxVal  = weekCounts.fold(0, (m, v) => v > m ? v : m);
-    final today   = DateTime.now().weekday - 1; // 0=Mon … 6=Sun
+    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final maxVal = weekCounts.fold(0, (m, v) => v > m ? v : m);
+    final today = DateTime.now().weekday - 1; // 0=Mon … 6=Sun
 
     // Growth % vs previous week (simulated)
     final thisWeek = weekCounts.fold(0, (a, b) => a + b);
@@ -890,19 +911,18 @@ class _ReportsScreenState extends State<ReportsScreen>
             ],
           ),
           const SizedBox(height: 12),
-
           SizedBox(
-            height: 80,
+            height: 86,
             child: AnimatedBuilder(
               animation: _weekBarAnim,
               builder: (_, __) => Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: List.generate(7, (i) {
-                  final val   = weekCounts[i];
+                  final val = weekCounts[i];
                   final isToday = i == today;
-                  final barH  = maxVal == 0
+                  final barH = maxVal == 0
                       ? 2.0
-                      : (val / maxVal * 60) * _weekBarAnim.value;
+                      : (val / maxVal * 54) * _weekBarAnim.value;
                   final color = isToday
                       ? _green1
                       : val > maxVal * 0.6
@@ -933,7 +953,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                               ),
                             ),
                           Container(
-                            height: barH.clamp(2.0, 60.0),
+                            height: barH.clamp(2.0, 54.0),
                             decoration: BoxDecoration(
                               color: color,
                               borderRadius: const BorderRadius.vertical(
@@ -969,9 +989,9 @@ class _ReportsScreenState extends State<ReportsScreen>
     required int weekScans,
   }) {
     final activities = [
-      {'name': 'Apple Tree #12',    'time': '10 min ago'},
-      {'name': 'Orange Tree #8',    'time': '30 min ago'},
-      {'name': 'Pine Tree #25',     'time': '1 hr ago'},
+      {'name': 'Apple Tree #12', 'time': '10 min ago'},
+      {'name': 'Orange Tree #8', 'time': '30 min ago'},
+      {'name': 'Pine Tree #25', 'time': '1 hr ago'},
       {'name': 'Jackfruit Tree #3', 'time': 'Yesterday'},
     ];
 
@@ -1025,14 +1045,15 @@ class _ReportsScreenState extends State<ReportsScreen>
           ),
           const SizedBox(height: 12),
           ...activities.asMap().entries.map((e) {
-            final a       = e.value;
-            final isOld   = a['time']!.contains('Yesterday');
+            final a = e.value;
+            final isOld = a['time']!.contains('Yesterday');
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(
                 children: [
                   Container(
-                    width: 36, height: 36,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFF3E0),
                       borderRadius: BorderRadius.circular(10),
@@ -1051,8 +1072,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                                 fontWeight: FontWeight.w600,
                                 color: _dark)),
                         Text(a['time']!,
-                            style: const TextStyle(
-                                fontSize: 10, color: _sub)),
+                            style: const TextStyle(fontSize: 10, color: _sub)),
                       ],
                     ),
                   ),
@@ -1083,7 +1103,8 @@ class _ReportsScreenState extends State<ReportsScreen>
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF1E4D2B).withValues(alpha: 0.07),
-            blurRadius: 8, offset: const Offset(0, 2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -1099,9 +1120,7 @@ class _ReportsScreenState extends State<ReportsScreen>
         const SizedBox(width: 7),
         Text(title,
             style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: _dark)),
+                fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
       ],
     );
   }
@@ -1115,7 +1134,7 @@ class _DonutPainter extends CustomPainter {
   final int unhealthy;
   final int recovering;
   final int total;
-  final double progress;  // 0.0 → 1.0 (animation)
+  final double progress; // 0.0 → 1.0 (animation)
   final int pct;
 
   _DonutPainter({
@@ -1129,8 +1148,8 @@ class _DonutPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final cx     = size.width / 2;
-    final cy     = size.height / 2;
+    final cx = size.width / 2;
+    final cy = size.height / 2;
     final radius = math.min(cx, cy) - 2;
     const stroke = 22.0;
 
@@ -1138,9 +1157,9 @@ class _DonutPainter extends CustomPainter {
 
     // Proportions
     final tot = total == 0 ? 1 : total;
-    final hAngle  = (healthy    / tot) * 2 * math.pi * progress;
-    final uAngle  = (unhealthy  / tot) * 2 * math.pi * progress;
-    final rAngle  = (recovering / tot) * 2 * math.pi * progress;
+    final hAngle = (healthy / tot) * 2 * math.pi * progress;
+    final uAngle = (unhealthy / tot) * 2 * math.pi * progress;
+    final rAngle = (recovering / tot) * 2 * math.pi * progress;
 
     // Background ring (grey when nothing)
     if (total == 0) {
@@ -1196,7 +1215,7 @@ class _DonutPainter extends CustomPainter {
   @override
   bool shouldRepaint(_DonutPainter old) =>
       old.progress != progress ||
-      old.healthy  != healthy  ||
+      old.healthy != healthy ||
       old.unhealthy != unhealthy ||
       old.recovering != recovering;
 }

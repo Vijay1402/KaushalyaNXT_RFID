@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'rfid_service.dart';
 import 'tag_protocol.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/router/route_paths.dart';
+import '../../core/services/local_cache_service.dart';
 import '../farmer/tree_details/tree_controller.dart';
 
 // ── States the scan screen moves through ─────────────────────────────────────
@@ -62,6 +65,8 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   // Spinning icon while connecting / scanning
   late AnimationController _spinCtrl;
   late Animation<double> _spinAnim;
+
+  static const double _unknownCoordinate = 0.0;
 
   @override
   void initState() {
@@ -539,6 +544,161 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     return months[date.month - 1];
   }
 
+  Map<String, dynamic> _tagDataToLocalMap(
+    TagData data, {
+    String? userHex,
+  }) {
+    return <String, dynamic>{
+      'epc': data.epc,
+      'tid': data.tid,
+      'treeId': data.treeId,
+      'farmerName': data.farmerName,
+      'lastInspectionUnix': data.lastInspectionUnix,
+      'healthStatus': data.healthStatus.index,
+      'lastYieldKg': data.lastYieldKg,
+      'treeAgeYears': data.treeAgeYears,
+      'species': data.species.index,
+      if (userHex != null && userHex.isNotEmpty) 'userHex': userHex,
+      'savedAt': DateTime.now().toIso8601String(),
+    };
+  }
+
+  TagData? _tagDataFromLocalMap(Map<String, dynamic>? raw) {
+    if (raw == null) return null;
+
+    final epc = (raw['epc'] ?? '').toString().trim();
+    final treeId = (raw['treeId'] ?? '').toString().trim();
+    if (epc.isEmpty && treeId.isEmpty) return null;
+
+    final healthIndex = (raw['healthStatus'] as num?)?.toInt() ?? 0;
+    final speciesIndex = (raw['species'] as num?)?.toInt() ?? 0;
+
+    return TagData(
+      epc: epc,
+      tid: (raw['tid'] ?? '').toString(),
+      treeId: treeId.isEmpty ? epc : treeId,
+      farmerName: (raw['farmerName'] ?? '').toString(),
+      lastInspectionUnix: (raw['lastInspectionUnix'] as num?)?.toInt() ?? 0,
+      healthStatus: HealthStatus
+          .values[healthIndex.clamp(0, HealthStatus.values.length - 1)],
+      lastYieldKg: (raw['lastYieldKg'] as num?)?.toDouble() ?? 0,
+      treeAgeYears: (raw['treeAgeYears'] as num?)?.toInt() ?? 0,
+      species: Species.values[speciesIndex.clamp(0, Species.values.length - 1)],
+    );
+  }
+
+  Future<void> _saveWrittenTagLocally(
+    TagData data, {
+    String? userHex,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    await LocalCacheService().saveWrittenTag(
+      user.uid,
+      _tagDataToLocalMap(data, userHex: userHex),
+    );
+  }
+
+  Future<TagData?> _getWrittenTagFromLocal({
+    String? epc,
+    String? treeId,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+
+    final local = LocalCacheService();
+    if (epc != null && epc.trim().isNotEmpty) {
+      final byEpc = await local.getWrittenTagByEpc(user.uid, epc);
+      final parsed = _tagDataFromLocalMap(byEpc);
+      if (parsed != null) return parsed;
+    }
+
+    if (treeId != null && treeId.trim().isNotEmpty) {
+      final byTreeId = await local.getWrittenTagByTreeId(user.uid, treeId);
+      final parsed = _tagDataFromLocalMap(byTreeId);
+      if (parsed != null) return parsed;
+    }
+
+    return null;
+  }
+
+  Future<
+      ({
+        String locationName,
+        double latitude,
+        double longitude,
+      })> _fetchDeviceLocation() async {
+    final status = await Permission.locationWhenInUse.request();
+    if (!status.isGranted) {
+      throw StateError('Location permission not granted.');
+    }
+
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw StateError('Location services are turned off.');
+    }
+
+    Position? position;
+    try {
+      position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 12),
+      );
+    } catch (_) {
+      position = await Geolocator.getLastKnownPosition();
+    }
+    if (position == null) {
+      throw StateError('Unable to get device location.');
+    }
+
+    String locationName = '';
+    try {
+      final placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        final placemark = placemarks.first;
+        final parts = <String>[
+          if ((placemark.street ?? '').trim().isNotEmpty)
+            placemark.street!.trim(),
+          if ((placemark.subLocality ?? '').trim().isNotEmpty)
+            placemark.subLocality!.trim(),
+          if ((placemark.locality ?? '').trim().isNotEmpty)
+            placemark.locality!.trim(),
+          if ((placemark.subAdministrativeArea ?? '').trim().isNotEmpty)
+            placemark.subAdministrativeArea!.trim(),
+          if ((placemark.administrativeArea ?? '').trim().isNotEmpty)
+            placemark.administrativeArea!.trim(),
+          if ((placemark.country ?? '').trim().isNotEmpty)
+            placemark.country!.trim(),
+        ];
+        final uniqueParts = <String>[];
+        for (final part in parts) {
+          if (part.isNotEmpty && !uniqueParts.contains(part)) {
+            uniqueParts.add(part);
+          }
+        }
+        locationName = uniqueParts.join(', ');
+      }
+    } catch (_) {
+      locationName = '';
+    }
+
+    if (locationName.isEmpty) {
+      locationName =
+          '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+    }
+
+    return (
+      locationName: locationName,
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
+  }
+
   Future<String> _saveTreeToFirestore(TagData data) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -559,6 +719,20 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
 
     final docRef = FirebaseFirestore.instance.collection('trees').doc(docId);
     final snapshot = await docRef.get();
+    String locationName = snapshot.data()?['location']?.toString() ?? '';
+    double latitude = (snapshot.data()?['latitude'] as num?)?.toDouble() ??
+        _unknownCoordinate;
+    double longitude = (snapshot.data()?['longitude'] as num?)?.toDouble() ??
+        _unknownCoordinate;
+
+    try {
+      final currentLocation = await _fetchDeviceLocation();
+      locationName = currentLocation.locationName;
+      latitude = currentLocation.latitude;
+      longitude = currentLocation.longitude;
+    } catch (_) {
+      // Keep existing Firestore location when device location is unavailable.
+    }
 
     final payload = <String, dynamic>{
       'treeId': treeId,
@@ -578,7 +752,9 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       'lastinspectiondate': Timestamp.fromDate(inspectionDate),
       'harvestMonth': _monthAbbreviation(inspectionDate),
       'isScanned': true,
-      'location': snapshot.data()?['location'] ?? '',
+      'location': locationName,
+      'latitude': latitude,
+      'longitude': longitude,
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
@@ -587,6 +763,15 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     }
 
     await docRef.set(payload, SetOptions(merge: true));
+    final cachePayload = Map<String, dynamic>.from(payload)
+      ..['updatedAt'] = DateTime.now().toIso8601String();
+    if (cachePayload['createdAt'] is FieldValue) {
+      cachePayload['createdAt'] = DateTime.now().toIso8601String();
+    }
+    await LocalCacheService().saveTree(
+      user.uid,
+      treeWithDocId(docId, cachePayload),
+    );
     return docId;
   }
 
@@ -689,32 +874,34 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
           epc: epc,
           tid: tid,
         );
+        await _saveWrittenTagLocally(tagData, userHex: userHex);
       } else {
-        // EPC recognized but tag has no USER payload yet.
-        tagData = TagData(
-          epc: epc,
-          tid: tid,
-          treeId: epc,
-          farmerName: '',
-          lastInspectionUnix: 0,
-          healthStatus: HealthStatus.unknown,
-          lastYieldKg: 0,
-          treeAgeYears: 0,
-          species: Species.unknown,
-        );
+        tagData = await _getWrittenTagFromLocal(epc: epc) ??
+            TagData(
+              epc: epc,
+              tid: tid,
+              treeId: epc,
+              farmerName: '',
+              lastInspectionUnix: 0,
+              healthStatus: HealthStatus.unknown,
+              lastYieldKg: 0,
+              treeAgeYears: 0,
+              species: Species.unknown,
+            );
       }
     } catch (e) {
-      tagData = TagData(
-        epc: epc,
-        tid: tid,
-        treeId: epc,
-        farmerName: '',
-        lastInspectionUnix: 0,
-        healthStatus: HealthStatus.unknown,
-        lastYieldKg: 0,
-        treeAgeYears: 0,
-        species: Species.unknown,
-      );
+      tagData = await _getWrittenTagFromLocal(epc: epc) ??
+          TagData(
+            epc: epc,
+            tid: tid,
+            treeId: epc,
+            farmerName: '',
+            lastInspectionUnix: 0,
+            healthStatus: HealthStatus.unknown,
+            lastYieldKg: 0,
+            treeAgeYears: 0,
+            species: Species.unknown,
+          );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -759,6 +946,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
         epc: _lastScannedEpc,
         tid: _lastScannedTid,
       );
+      await _saveWrittenTagLocally(tagData, userHex: userHexValue);
 
       // Update the cached data with the freshly-read data
       _lastTagData = tagData;
@@ -778,6 +966,28 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       if (!mounted) return;
       setState(() => _state = _ScanState.tagReady);
     } catch (e) {
+      final localTag = await _getWrittenTagFromLocal(
+        epc: _lastScannedEpc,
+        treeId: _lastTagData?.treeId,
+      );
+      if (localTag != null) {
+        _lastTagData = localTag;
+        _tagDataByEpc[_lastScannedEpc.toUpperCase()] = localTag;
+        _tagHasUserData = _hasValidUserData(localTag);
+
+        final localTreeId = localTag.treeId.trim();
+        if (localTreeId.isNotEmpty) {
+          await _openTreeFromTreeId(localTreeId);
+          return;
+        }
+
+        if (!mounted) return;
+        await _showReadTagDialog(localTag);
+        if (!mounted) return;
+        setState(() => _state = _ScanState.tagReady);
+        return;
+      }
+
       // Re-read can fail if the tag moved out of range. If we already decoded
       // data from the latest scan, keep flow smooth by using cached treeId.
       final cached = _lastTagData;
@@ -1020,6 +1230,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     if (_lastScannedEpc.isNotEmpty) {
       _tagDataByEpc[_lastScannedEpc.toUpperCase()] = updated;
     }
+    await _saveWrittenTagLocally(updated, userHex: hex);
     setState(() => _state = _ScanState.tagReady);
 
     // Show final result
@@ -1089,8 +1300,14 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   }) async {
     final nowUnix = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final bool doPrefill = prefillUserData && initial != null;
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    final defaultUserName = (firebaseUser?.displayName ?? '').trim().isNotEmpty
+        ? firebaseUser!.displayName!.trim()
+        : ((firebaseUser?.email ?? '').contains('@')
+            ? firebaseUser!.email!.split('@').first
+            : '');
 
-    String farmerText = '';
+    String farmerText = defaultUserName;
     String yieldText = '';
     String ageText = '';
     HealthStatus health = HealthStatus.unknown;

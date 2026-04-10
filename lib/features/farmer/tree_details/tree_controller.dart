@@ -2,6 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../../core/services/local_cache_service.dart';
+import '../../auth/providers/auth_provider.dart';
+
+const String treeDocIdField = '_docId';
+
 final firestoreProvider = Provider<FirebaseFirestore>((ref) {
   return FirebaseFirestore.instance;
 });
@@ -34,6 +39,17 @@ const List<String> _emailOwnerFields = <String>[
   'ownerEmail',
   'farmerEmail',
 ];
+
+String treeDocIdOf(Map<String, dynamic> tree) {
+  return (tree[treeDocIdField] ?? '').toString();
+}
+
+Map<String, dynamic> treeWithDocId(String docId, Map<String, dynamic> data) {
+  return <String, dynamic>{
+    treeDocIdField: docId,
+    ...data,
+  };
+}
 
 Future<_TreeOwnerQuery> _resolveTreeOwnerQuery({
   required FirebaseFirestore firestore,
@@ -101,6 +117,12 @@ Future<String?> findOwnedTreeDocumentIdByTreeId({
   final normalizedTreeId = treeId.trim().toLowerCase();
   if (normalizedTreeId.isEmpty) return null;
 
+  final cache = LocalCacheService();
+  final cachedDocId = await cache.findTreeDocIdByTreeId(user.uid, treeId);
+  if (cachedDocId != null) {
+    return cachedDocId;
+  }
+
   final ownerQuery = await _resolveTreeOwnerQuery(
     firestore: firestore,
     user: user,
@@ -111,60 +133,100 @@ Future<String?> findOwnedTreeDocumentIdByTreeId({
       .where(ownerQuery.field, isEqualTo: ownerQuery.value)
       .get();
 
-  for (final doc in snapshot.docs) {
-    final data = doc.data();
-    final docTreeId = (data['treeId'] ?? '').toString().trim().toLowerCase();
+  final trees = snapshot.docs
+      .map((doc) => treeWithDocId(doc.id, doc.data()))
+      .toList(growable: false);
+  await cache.saveTrees(user.uid, trees);
+
+  for (final tree in trees) {
+    final docTreeId = (tree['treeId'] ?? '').toString().trim().toLowerCase();
     if (docTreeId == normalizedTreeId) {
-      return doc.id;
+      return treeDocIdOf(tree);
     }
   }
 
   return null;
 }
 
-final treesProvider =
-    StreamProvider.autoDispose<QuerySnapshot<Map<String, dynamic>>>(
-        (ref) async* {
-  final firestore = ref.read(firestoreProvider);
-  final auth = ref.read(firebaseAuthProvider);
-  final user = auth.currentUser;
+final treesProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>(
+  (ref) async* {
+    final firestore = ref.read(firestoreProvider);
+    final auth = ref.read(firebaseAuthProvider);
+    final cache = ref.read(localCacheServiceProvider);
+    final user = auth.currentUser;
 
-  if (user == null) {
-    yield* firestore
-        .collection('trees')
-        .where('userId', isEqualTo: '__no_authenticated_user__')
-        .snapshots();
-    return;
-  }
+    if (user == null) {
+      yield const [];
+      return;
+    }
 
-  final ownerQuery = await _resolveTreeOwnerQuery(
-    firestore: firestore,
-    user: user,
-  );
+    final cachedTrees = await cache.getTrees(user.uid);
+    if (cachedTrees.isNotEmpty) {
+      yield cachedTrees;
+    }
 
-  yield* firestore
-      .collection('trees')
-      .where(ownerQuery.field, isEqualTo: ownerQuery.value)
-      .snapshots();
-});
+    try {
+      final ownerQuery = await _resolveTreeOwnerQuery(
+        firestore: firestore,
+        user: user,
+      );
 
-final treeByIdProvider = StreamProvider.autoDispose
-    .family<DocumentSnapshot<Map<String, dynamic>>?, String>((ref, id) async* {
-  final firestore = ref.read(firestoreProvider);
-  final auth = ref.read(firebaseAuthProvider);
-  final user = auth.currentUser;
+      await for (final snapshot in firestore
+          .collection('trees')
+          .where(ownerQuery.field, isEqualTo: ownerQuery.value)
+          .snapshots()) {
+        final trees = snapshot.docs
+            .map((doc) => treeWithDocId(doc.id, doc.data()))
+            .toList(growable: false);
+        await cache.saveTrees(user.uid, trees);
+        yield trees;
+      }
+    } catch (_) {
+      if (cachedTrees.isEmpty) {
+        yield const [];
+      }
+    }
+  },
+);
 
-  if (user == null) {
-    yield null;
-    return;
-  }
+final treeByIdProvider =
+    StreamProvider.autoDispose.family<Map<String, dynamic>?, String>(
+  (ref, id) async* {
+    final firestore = ref.read(firestoreProvider);
+    final auth = ref.read(firebaseAuthProvider);
+    final cache = ref.read(localCacheServiceProvider);
+    final user = auth.currentUser;
 
-  yield* firestore.collection('trees').doc(id).snapshots().map((doc) {
-    if (!doc.exists) return null;
+    if (user == null) {
+      yield null;
+      return;
+    }
 
-    final data = doc.data();
-    if (data == null) return null;
+    final cachedTree = await cache.getTreeByDocId(user.uid, id);
+    if (cachedTree != null) {
+      yield cachedTree;
+    }
 
-    return _treeBelongsToUser(data, user) ? doc : null;
-  });
-});
+    try {
+      await for (final doc
+          in firestore.collection('trees').doc(id).snapshots()) {
+        if (!doc.exists) {
+          yield null;
+          continue;
+        }
+
+        final data = doc.data();
+        if (data == null || !_treeBelongsToUser(data, user)) {
+          yield null;
+          continue;
+        }
+
+        final tree = treeWithDocId(doc.id, data);
+        await cache.saveTree(user.uid, tree);
+        yield tree;
+      }
+    } catch (_) {
+      yield cachedTree;
+    }
+  },
+);

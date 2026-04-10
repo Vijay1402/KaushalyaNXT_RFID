@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kaushalyanxt_rfid/features/farmer/tree_details/tree_controller.dart';
 
 class MyTreesScreen extends ConsumerStatefulWidget {
@@ -47,8 +47,8 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
       _autoOpenedFromRoute = false;
       search = treeId.toLowerCase();
       _searchController.text = treeId;
-      _searchController.selection =
-          TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+      _searchController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _searchController.text.length));
     }
   }
 
@@ -63,7 +63,6 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-
       appBar: AppBar(
         title: const Text("My Trees"),
         backgroundColor: Colors.green,
@@ -75,10 +74,8 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
           ),
         ],
       ),
-
       body: Column(
         children: [
-
           /// SEARCH + CHIPS
           Container(
             margin: const EdgeInsets.all(12),
@@ -92,7 +89,6 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
             ),
             child: Column(
               children: [
-
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
@@ -106,22 +102,28 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
                     setState(() => search = val.toLowerCase());
                   },
                 ),
-
                 const SizedBox(height: 12),
-
                 treesAsync.when(
-                  data: (snapshot) {
+                  data: (trees) {
+                    final all = trees.length;
 
-                    final all = snapshot.docs.length;
+                    final healthy = trees
+                        .where((data) =>
+                            _statusLabel(data['healthStatus']?.toString()) ==
+                            "Healthy")
+                        .length;
 
-                    final healthy = snapshot.docs.where((d) =>
-                        _statusLabel((d.data() as Map)['healthStatus']) == "Healthy").length;
+                    final need = trees
+                        .where((data) =>
+                            _statusLabel(data['healthStatus']?.toString()) ==
+                            "NeedsAttention")
+                        .length;
 
-                    final need = snapshot.docs.where((d) =>
-                        _statusLabel((d.data() as Map)['healthStatus']) == "NeedsAttention").length;
-
-                    final risk = snapshot.docs.where((d) =>
-                        _statusLabel((d.data() as Map)['healthStatus']) == "AtRisk").length;
+                    final risk = trees
+                        .where((data) =>
+                            _statusLabel(data['healthStatus']?.toString()) ==
+                            "AtRisk")
+                        .length;
 
                     return Wrap(
                       spacing: 10,
@@ -129,7 +131,8 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
                       children: [
                         _chip("All", "All ($all)", Colors.green),
                         _chip("Healthy", "Healthy ($healthy)", Colors.green),
-                        _chip("NeedsAttention", "Need Attention ($need)", Colors.orange),
+                        _chip("NeedsAttention", "Need Attention ($need)",
+                            Colors.orange),
                         _chip("AtRisk", "At Risk ($risk)", Colors.red),
                       ],
                     );
@@ -144,11 +147,8 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
           /// TREE LIST
           Expanded(
             child: treesAsync.when(
-              data: (snapshot) {
-
-                final docs = snapshot.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-
+              data: (trees) {
+                final docs = trees.where((data) {
                   final id = (data['treeId'] ?? "").toString().toLowerCase();
                   final loc = (data['location'] ?? "").toString().toLowerCase();
                   final health = _statusLabel(data['healthStatus']);
@@ -204,15 +204,14 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
                       matchAge &&
                       matchMonth &&
                       matchScan;
-
                 }).toList();
 
                 // If navigated here with ?treeId=..., auto-open that tree once found.
                 if (_routeTreeId.isNotEmpty && !_autoOpenedFromRoute) {
                   final wanted = _routeTreeId.toLowerCase();
-                  QueryDocumentSnapshot? matchDoc;
-                  for (final d in snapshot.docs) {
-                    final data = d.data() as Map<String, dynamic>;
+                  Map<String, dynamic>? matchDoc;
+                  for (final d in trees) {
+                    final data = d;
                     final id = (data['treeId'] ?? "").toString().toLowerCase();
                     if (id == wanted) {
                       matchDoc = d;
@@ -225,7 +224,7 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
                       if (!mounted) return;
                       context.pushNamed(
                         'treeDetails',
-                        extra: matchDoc!.id,
+                        extra: treeDocIdOf(matchDoc!),
                         queryParameters: const {'source': 'rfid'},
                       );
                     });
@@ -240,8 +239,7 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   itemCount: docs.length,
                   itemBuilder: (_, i) {
-
-                    final data = docs[i].data() as Map<String, dynamic>;
+                    final data = docs[i];
 
                     final id = data['treeId'] ?? '';
                     final loc = data['location'] ?? '';
@@ -253,7 +251,7 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
                       onTap: () {
                         context.pushNamed(
                           'treeDetails',
-                          extra: docs[i].id,
+                          extra: treeDocIdOf(docs[i]),
                           queryParameters: const {'source': 'myTrees'},
                         );
                       },
@@ -272,7 +270,9 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(id, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  Text(id,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold)),
                                   Text("ID: $id | $species"),
                                   Text("Plot: $loc"),
                                   Text("Last Inspection: $date"),
@@ -309,8 +309,8 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: color),
         ),
-        child: Text(label,
-            style: TextStyle(color: active ? Colors.white : color)),
+        child:
+            Text(label, style: TextStyle(color: active ? Colors.white : color)),
       ),
     );
   }
@@ -366,6 +366,18 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
       if (date is Timestamp) {
         return DateFormat('dd/MM/yyyy').format(date.toDate());
       }
+      if (date is String && date.isNotEmpty) {
+        final parsed = DateTime.tryParse(date);
+        if (parsed != null) {
+          return DateFormat('dd/MM/yyyy').format(parsed);
+        }
+      }
+      if (date is Map && date['_seconds'] != null) {
+        final seconds = (date['_seconds'] as num).toInt();
+        return DateFormat('dd/MM/yyyy').format(
+          DateTime.fromMillisecondsSinceEpoch(seconds * 1000),
+        );
+      }
     } catch (_) {}
     return "-";
   }
@@ -393,8 +405,18 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
 
   final ageOptions = ["0-1", "1-5", "5-10", "10-20", "20+"];
   final months = [
-    "Jan","Feb","Mar","Apr","May","Jun",
-    "Jul","Aug","Sep","Oct","Nov","Dec"
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec"
   ];
   final scanOptions = ["All", "Scanned", "Not Scanned"];
 
@@ -414,15 +436,11 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           const Text("Filters",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-
           const SizedBox(height: 20),
-
           const Text("Tree Age", style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
-
           Wrap(
             spacing: 10,
             children: ageOptions.map((e) {
@@ -433,25 +451,23 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
               );
             }).toList(),
           ),
-
           const SizedBox(height: 20),
-
-          const Text("Harvest Month", style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text("Harvest Month",
+              style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
-
           DropdownButtonFormField<String>(
             value: month.isEmpty ? null : month,
             hint: const Text("Select Month"),
             isExpanded: true,
-            items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+            items: months
+                .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                .toList(),
             onChanged: (val) => setState(() => month = val!),
           ),
-
           const SizedBox(height: 20),
-
-          const Text("Scan Status", style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text("Scan Status",
+              style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
-
           Wrap(
             spacing: 10,
             children: scanOptions.map((s) {
@@ -462,9 +478,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
               );
             }).toList(),
           ),
-
           const Spacer(),
-
           Row(
             children: [
               Expanded(

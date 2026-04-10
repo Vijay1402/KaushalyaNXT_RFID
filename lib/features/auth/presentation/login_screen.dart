@@ -239,55 +239,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 20),
 
-              /// GOOGLE LOGIN
-              Container(
-                width: double.infinity,
-                height: 50,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.black26),
-                  color: Colors.white,
-                ),
-                child: TextButton.icon(
-                  onPressed: () async {
-                    final messenger =
-                        ScaffoldMessenger.of(context);
-
-                    try {
-                      await ref
-                          .read(authStateProvider.notifier)
-                          .loginWithGoogle();
-
-                      final user =
-                          ref.read(authStateProvider).user;
-
-                      if (!mounted) return;
-
-                      if (user != null) {
-                        context.go('/farmer');
-                      }
-                    } catch (e) {
-                      messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text("Google login failed"),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  },
-                  icon: Image.network(
-                    'https://cdn-icons-png.flaticon.com/512/300/300221.png',
-                    height: 20,
-                  ),
-                  label: const Text(
-                    "CONTINUE WITH GOOGLE",
-                    style: TextStyle(color: Colors.black87),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
               /// REGISTER NAV
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
