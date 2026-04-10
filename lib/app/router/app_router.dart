@@ -76,6 +76,7 @@ GoRouter createRouter(Ref ref) {
 
       /// MY TREES
       GoRoute(
+        name: 'myTrees',
         path: '/my-trees',
         builder: (context, state) => const MyTreesScreen(),
       ),
@@ -119,7 +120,11 @@ GoRouter createRouter(Ref ref) {
         path: '/treedetails',
         builder: (context, state) {
           final id = state.extra as String;
-          return TreeDetailScreen(treeId: id);
+          final source = state.uri.queryParameters['source'] ?? 'myTrees';
+          return TreeDetailScreen(
+            treeId: id,
+            source: source,
+          );
         },
       ),
     ],

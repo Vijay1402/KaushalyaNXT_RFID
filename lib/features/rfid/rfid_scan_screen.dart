@@ -1,13 +1,16 @@
 // ============================================================
 //  lib/features/rfid/rfid_scan_screen.dart   (NEW FILE)
 // ============================================================
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'rfid_service.dart';
 import 'tag_protocol.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/router/route_paths.dart';
+import '../farmer/tree_details/tree_controller.dart';
 
 // ── States the scan screen moves through ─────────────────────────────────────
 enum _ScanState {
@@ -40,6 +43,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   String? _selectedDeviceAddress;
   String? _selectedDeviceName;
   String _lastScannedEpc = '';
+  String _lastScannedTid = '';
   final List<String> _scannedTagHistory = <String>[];
   final Map<String, TagData> _tagDataByEpc = <String, TagData>{};
   TagData? _lastTagData;
@@ -50,8 +54,6 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   bool _sessionMultiTagMode = false; // Single default
   bool _sessionRequireTrigger = true; // prefer physical trigger by default
   bool _sessionSetupDone = false;
-
-  int _epcCounter = 0;
 
   // Pulse rings that expand outward while scanning
   late AnimationController _pulseCtrl;
@@ -152,6 +154,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     setState(() {
       _selectedDeviceAddress = null;
       _lastScannedEpc = '';
+      _lastScannedTid = '';
       _lastTagData = null;
       _tagHasUserData = false;
       _sessionSetupDone = false;
@@ -415,22 +418,78 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
         data.treeAgeYears != 0;
   }
 
+  bool _isNoTagDetectedError(Object error) {
+    final text = error.toString().toLowerCase();
+    if (text.contains('no epc detected')) return true;
+
+    if (error is PlatformException) {
+      final message = (error.message ?? '').toLowerCase();
+      if (message.contains('no epc detected')) return true;
+
+      final details = error.details;
+      if (details is Map) {
+        final detailMessage =
+            (details['message'] ?? '').toString().toLowerCase();
+        if (detailMessage.contains('no epc detected')) return true;
+      }
+    }
+
+    return false;
+  }
+
   String _platformErrorMessage(Object error,
       {String fallback = 'Operation failed'}) {
+    if (_isNoTagDetectedError(error)) {
+      return 'No tag detected. Keep one tag very close to the reader and try scanning again.';
+    }
+
     if (error is PlatformException) {
-      final code = error.code;
       final msg = (error.message ?? '').trim();
       final details = error.details;
-      final detailsText = details == null ? '' : details.toString().trim();
-      final pieces = <String>[
-        if (code.isNotEmpty) code,
-        if (msg.isNotEmpty) msg,
-        if (detailsText.isNotEmpty) detailsText,
-      ];
-      if (pieces.isNotEmpty) return pieces.join(' | ');
+      final detailsText = details is Map
+          ? (details['message'] ?? '').toString().trim()
+          : details?.toString().trim() ?? '';
+
+      if (msg.isNotEmpty) return msg;
+      if (detailsText.isNotEmpty) return detailsText;
+      if (error.code.isNotEmpty) return error.code;
     }
     final text = error.toString().trim();
     return text.isEmpty ? fallback : text;
+  }
+
+  Future<void> _openTreeFromTreeId(String treeId) async {
+    final normalizedTreeId = treeId.trim();
+    if (normalizedTreeId.isEmpty || !mounted) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final docId = await findOwnedTreeDocumentIdByTreeId(
+          firestore: FirebaseFirestore.instance,
+          user: user,
+          treeId: normalizedTreeId,
+        );
+
+        if (!mounted) return;
+        if (docId != null) {
+          GoRouter.of(context).pushNamed(
+            'treeDetails',
+            extra: docId,
+            queryParameters: const {'source': 'rfid'},
+          );
+          return;
+        }
+      } catch (_) {
+        // Fall back to My Trees below if direct lookup fails.
+      }
+    }
+
+    if (!mounted) return;
+    GoRouter.of(context).pushNamed(
+      'myTrees',
+      queryParameters: {'treeId': normalizedTreeId},
+    );
   }
 
   Future<void> _scanTagFromReader() async {
@@ -486,7 +545,10 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       );
       return;
     }
-    setState(() => _lastScannedEpc = epcOnly);
+    setState(() {
+      _lastScannedEpc = epcOnly;
+      _lastScannedTid = tidOnly;
+    });
     _addToTagHistory(epcOnly);
 
     Map<String, String> payload = <String, String>{};
@@ -577,41 +639,63 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   }
 
   Future<void> _onReadPressed() async {
-    TagData? tagData = _lastTagData;
-    if (tagData == null) {
+    if (_lastScannedEpc.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Press SCAN TAG first.')),
       );
       return;
     }
 
-    if (!_tagHasUserData) {
-      final cached = _tagDataByEpc[_lastScannedEpc.toUpperCase()];
-      if (cached != null && _hasValidUserData(cached)) {
-        tagData = cached;
-        _lastTagData = cached;
-        _tagHasUserData = true;
-      }
-    }
-
-    // If the tag contains a Tree ID, navigate to Tree Details screen.
-    final treeId = tagData.treeId.trim();
-    if (treeId.isNotEmpty) {
-      // Use GoRouter route named 'treeDetails' and pass treeId as extra.
-      // This will show the TreeDetailScreen for the scanned tree.
-      // Do not change the scan state — stay in tagReady after navigation.
-      // Use context.goNamed to replace current location.
-      // Import of go_router is available via project setup.
-      // Navigate and return early.
-      // ignore: use_build_context_synchronously
-      GoRouter.of(context).goNamed('treeDetails', extra: treeId);
-      return;
-    }
-
     setState(() => _state = _ScanState.reading);
-    await _showReadTagDialog(tagData);
-    if (!mounted) return;
-    setState(() => _state = _ScanState.tagReady);
+
+    try {
+      // Re-read the tag immediately to get the latest treeId (updated after write)
+      final userHex = await _rfid.readUserBank(
+        deviceAddress: _selectedDeviceAddress ?? '',
+        targetEpc: _lastScannedEpc,
+      );
+
+      final userHexValue = userHex['userHex'] ?? '';
+      var tagData = decodeTagData(
+        userHexValue,
+        epc: _lastScannedEpc,
+        tid: _lastScannedTid,
+      );
+
+      // Update the cached data with the freshly-read data
+      _lastTagData = tagData;
+      _tagDataByEpc[_lastScannedEpc.toUpperCase()] = tagData;
+      _tagHasUserData = _hasValidUserData(tagData);
+
+      // Navigate to "My Trees" using the Tree ID stored in USER[0..11] (no EPC fallback).
+      final storedTreeId = decodeTreeIdFromUserHex(userHexValue).trim();
+      if (storedTreeId.isNotEmpty) {
+        await _openTreeFromTreeId(storedTreeId);
+        return;
+      }
+
+      // No treeId stored; show the read dialog with tag data
+      if (!mounted) return;
+      await _showReadTagDialog(tagData);
+      if (!mounted) return;
+      setState(() => _state = _ScanState.tagReady);
+    } catch (e) {
+      // Re-read can fail if the tag moved out of range. If we already decoded
+      // data from the latest scan, keep flow smooth by using cached treeId.
+      final cached = _lastTagData;
+      if (cached != null) {
+        final fallbackTreeId = cached.treeId.trim();
+        if (fallbackTreeId.isNotEmpty) {
+          await _openTreeFromTreeId(fallbackTreeId);
+          return;
+        }
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Read failed: $e')),
+      );
+      setState(() => _state = _ScanState.tagReady);
+    }
   }
 
   Future<void> _showReadTagDialog(TagData data) async {
@@ -820,15 +904,6 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       );
     }
 
-    // DEBUG: show what was written and whether it succeeded
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Write result: ${ok ? 'OK' : 'FAILED'}; TreeID=${updated.treeId}; USER_HEX=${hex.substring(0, min(80, hex.length))}...'),
-        duration: const Duration(seconds: 4),
-        backgroundColor: ok ? Colors.green : Colors.red,
-      ),
-    );
-
     if (!mounted) return;
     _lastTagData = updated;
     _tagHasUserData = true;
@@ -837,34 +912,16 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     }
     setState(() => _state = _ScanState.tagReady);
 
+    // Show final result
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'Tag written successfully.' : 'Write failed.'),
+        content: Text(ok
+            ? 'Tag written successfully. Click READ when ready.'
+            : 'Write failed.'),
         backgroundColor: ok ? Colors.green : Colors.red,
+        duration: const Duration(seconds: 3),
       ),
     );
-  }
-
-  String _generateNewEpcHex12B() {
-    // 12 bytes (96-bit) EPC. Use time + increment + secure random.
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-    final counter = (_epcCounter++ & 0xFFFFFFFF);
-
-    final bytes = Uint8List(12);
-    // first 8 bytes: millis (big-endian)
-    for (var i = 0; i < 8; i++) {
-      bytes[i] = (nowMs >> (56 - 8 * i)) & 0xFF;
-    }
-    // next 4 bytes: counter (big-endian)
-    for (var i = 0; i < 4; i++) {
-      bytes[8 + i] = (counter >> (24 - 8 * i)) & 0xFF;
-    }
-    // mix in a little randomness
-    final rnd = Random.secure();
-    for (var i = 0; i < 12; i++) {
-      bytes[i] = bytes[i] ^ rnd.nextInt(256);
-    }
-    return bytesToHex(bytes); // 24 hex chars
   }
 
   Future<void> _showReadWriteChoiceDialog() async {
@@ -916,6 +973,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     double? yieldInput;
     int? ageInput;
 
+    String treeIdText = ''; // Start blank; user enters custom treeId
     if (doPrefill) {
       // `doPrefill` implies `initial != null`
       farmerText = initial.farmerName;
@@ -925,12 +983,16 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       species = initial.species;
       yieldInput = initial.lastYieldKg;
       ageInput = initial.treeAgeYears;
+      // Prefill treeId only if already set (not EPC)
+      if (initial.treeId.isNotEmpty && initial.treeId != newEpcHex) {
+        treeIdText = initial.treeId;
+      }
     }
 
     final farmerController = TextEditingController(text: farmerText);
     final yieldController = TextEditingController(text: yieldText);
     final ageController = TextEditingController(text: ageText);
-    final treeIdController = TextEditingController(text: newEpcHex);
+    final treeIdController = TextEditingController(text: treeIdText);
 
     return showDialog<TagData>(
       context: context,
@@ -1051,7 +1113,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
                   child: const Text('CANCEL'),
                 ),
                 ElevatedButton(
-                    onPressed: () {
+                  onPressed: () {
                     final farmerName = farmerController.text.trim();
                     if (farmerName.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1076,7 +1138,8 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
                     try {
                       final enteredTreeId = treeIdController.text.trim();
                       final data = TagData(
-                        treeId: enteredTreeId.isEmpty ? newEpcHex : enteredTreeId,
+                        treeId:
+                            enteredTreeId.isEmpty ? newEpcHex : enteredTreeId,
                         epc: newEpcHex, // Tag ID remains the EPC value
                         tid: initial?.tid ?? '',
                         farmerName: farmerName,
@@ -1192,7 +1255,14 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
         // Down arrow to dismiss
         leading: IconButton(
           icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            final router = GoRouter.of(context);
+            if (router.canPop()) {
+              router.pop();
+            } else {
+              router.go(RoutePaths.farmerHome);
+            }
+          },
         ),
         actions: [
           IconButton(
@@ -1299,6 +1369,19 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
                 style: TextStyle(
                   color: _accentColor.withValues(alpha: 0.9),
                   fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          // DEBUG: Show decoded treeId after scan
+          if (_lastTagData != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 28, top: 4),
+              child: Text(
+                'Decoded treeId: ${_lastTagData!.treeId}',
+                style: TextStyle(
+                  color: Colors.blue.shade600,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
               ),

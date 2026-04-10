@@ -20,23 +20,44 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
   String selectedMonth = '';
   String selectedScan = '';
 
+  final TextEditingController _searchController = TextEditingController();
+  String _routeTreeId = '';
+  bool _autoOpenedFromRoute = false;
+
   @override
-    void didChangeDependencies() {
-      super.didChangeDependencies();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
 
-        final uri = GoRouterState.of(context).uri;
-        final filter = uri.queryParameters['filter'];
+    final uri = GoRouterState.of(context).uri;
+    final filter = uri.queryParameters['filter'];
+    final treeId = (uri.queryParameters['treeId'] ?? '').trim();
 
-        if (filter != null) {
-          if (filter == "healthy") {
-            selectedFilter = "Healthy";
-          } else if (filter == "attention") {
-            selectedFilter = "NeedsAttention";
-        } else {
-          selectedFilter = "All";
-        }
+    if (filter != null) {
+      if (filter == "healthy") {
+        selectedFilter = "Healthy";
+      } else if (filter == "attention") {
+        selectedFilter = "NeedsAttention";
+      } else {
+        selectedFilter = "All";
       }
     }
+
+    if (treeId.isNotEmpty && treeId != _routeTreeId) {
+      _routeTreeId = treeId;
+      _autoOpenedFromRoute = false;
+      search = treeId.toLowerCase();
+      _searchController.text = treeId;
+      _searchController.selection =
+          TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Widget build(BuildContext context) {
     final treesAsync = ref.watch(treesProvider);
 
@@ -73,6 +94,7 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
               children: [
 
                 TextField(
+                  controller: _searchController,
                   decoration: InputDecoration(
                     hintText: "Search by Tree ID, Location...",
                     prefixIcon: const Icon(Icons.search),
@@ -185,6 +207,31 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
 
                 }).toList();
 
+                // If navigated here with ?treeId=..., auto-open that tree once found.
+                if (_routeTreeId.isNotEmpty && !_autoOpenedFromRoute) {
+                  final wanted = _routeTreeId.toLowerCase();
+                  QueryDocumentSnapshot? matchDoc;
+                  for (final d in snapshot.docs) {
+                    final data = d.data() as Map<String, dynamic>;
+                    final id = (data['treeId'] ?? "").toString().toLowerCase();
+                    if (id == wanted) {
+                      matchDoc = d;
+                      break;
+                    }
+                  }
+                  if (matchDoc != null) {
+                    _autoOpenedFromRoute = true;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+                      context.pushNamed(
+                        'treeDetails',
+                        extra: matchDoc!.id,
+                        queryParameters: const {'source': 'rfid'},
+                      );
+                    });
+                  }
+                }
+
                 if (docs.isEmpty) {
                   return const Center(child: Text("No Trees Found"));
                 }
@@ -204,7 +251,11 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
 
                     return GestureDetector(
                       onTap: () {
-                        context.pushNamed('treeDetails', extra: docs[i].id);
+                        context.pushNamed(
+                          'treeDetails',
+                          extra: docs[i].id,
+                          queryParameters: const {'source': 'myTrees'},
+                        );
                       },
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 12),

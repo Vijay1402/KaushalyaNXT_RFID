@@ -310,13 +310,36 @@ class MainActivity : FlutterActivity() {
         if (!connectDeviceInternal(deviceAddress)) throw IllegalStateException("Reader connect failed")
 
         val boundedTimeout = timeoutMs.coerceIn(3000, 12000)
-        val tag = inventorySingleFromBuffer(r, boundedTimeout)
+        val attempts = when {
+            boundedTimeout >= 9000 -> 4
+            boundedTimeout >= 5000 -> 3
+            else -> 2
+        }
+        val attemptTimeout = (boundedTimeout / attempts).coerceAtLeast(1500)
+
+        var tag: UHFTAGInfo? = null
+        for (attempt in 0 until attempts) {
+            tag = inventorySingleFromBuffer(r, attemptTimeout)
+            val epcCandidate = tag?.getEPC()?.trim().orEmpty()
+            if (epcCandidate.isNotEmpty()) {
+                break
+            }
+
+            Log.w("RFID_SCAN", "scanTagIdentity: no EPC on attempt ${attempt + 1}/$attempts")
+            try {
+                configureReaderSessionInternal(
+                    safeGetFrequency(r).takeIf { it >= 0 } ?: 0x04,
+                    false
+                )
+            } catch (_: Exception) {}
+            try { Thread.sleep(180) } catch (_: Exception) {}
+        }
 
         val epc = tag?.getEPC()?.trim() ?: ""
         val tid = tag?.getTid()?.trim() ?: ""
         if (epc.isBlank()) {
             throw IllegalStateException(
-                "No EPC detected (timeoutMs=$boundedTimeout, connectStatus=${r.getConnectStatus()}, " +
+                "No EPC detected after $attempts attempts (timeoutMs=$boundedTimeout, connectStatus=${r.getConnectStatus()}, " +
                     "power=${safeGetPower(r)}, freq=${safeGetFrequency(r)})"
             )
         }
@@ -333,43 +356,70 @@ class MainActivity : FlutterActivity() {
         connectedDeviceAddress = deviceAddress
         if (!connectDeviceInternal(deviceAddress)) throw IllegalStateException("Reader connect failed")
 
-        val epc: String
-        val tid: String
+        val requestedEpc = targetEpc.trim().replace(" ", "").uppercase()
+        val hasFilter = requestedEpc.isNotBlank()
 
-        if (targetEpc.isNotBlank()) {
-            // Use provided EPC, assume TID is not needed for filtering
-            epc = targetEpc.trim().uppercase()
-            tid = ""  // We don't have TID when filtering by EPC
-        } else {
-            // No filter provided, do inventory to find a tag
+        // Best-effort TID: inventory once (but never trust it if EPC mismatch).
+        var tid = ""
+        var epc = ""
+        try {
             val tag = inventorySingleFromBuffer(r)
-                ?: throw IllegalStateException("No tag found")
-            epc = tag.getEPC()?.trim() ?: ""
-            tid = tag.getTid()?.trim() ?: ""
-            if (epc.isBlank()) throw IllegalStateException("EPC is empty")
+            if (tag != null) {
+                val invEpc = tag.getEPC()?.trim()?.replace(" ", "")?.uppercase() ?: ""
+                val invTid = tag.getTid()?.trim()?.replace(" ", "")?.uppercase() ?: ""
+                if (!hasFilter || invEpc == requestedEpc) {
+                    epc = invEpc
+                    tid = invTid
+                }
+            }
+        } catch (_: Exception) {}
+
+        if (hasFilter) {
+            epc = requestedEpc
+        }
+        if (epc.isBlank()) throw IllegalStateException("EPC is empty")
+
+        // Read USER bank. Try filtered first; if it returns empty, fall back to unfiltered.
+        // This keeps reads reliable on readers/tags where strict EPC filtering can intermittently fail.
+        var userHex: String? = null
+        if (hasFilter) {
+            userHex = try {
+                val filterLenBits = requestedEpc.length * 4
+                // EPC bank: skip 32 bits (CRC+PC), then match EPC bits.
+                r.readData(
+                    "00000000",
+                    BANK_EPC,
+                    32,
+                    filterLenBits,
+                    requestedEpc,
+                    BANK_USER,
+                    0,
+                    43
+                )
+            } catch (e: Exception) {
+                Log.e("RFID", "readUserBank: filtered read exception: $e")
+                null
+            }
+        }
+        if (userHex.isNullOrBlank()) {
+            userHex = try {
+                Log.w("RFID", "readUserBank: filtered read empty, trying unfiltered fallback")
+                r.readData("00000000", BANK_USER, 0, 43)
+            } catch (e: Exception) {
+                Log.e("RFID", "readUserBank: unfiltered fallback exception: $e")
+                null
+            }
         }
 
-        // Read USER bank, with filtering if we have EPC
-        val userHex: String?
-        if (targetEpc.isNotBlank()) {
-            // Filtered read: only read from the tag with this exact EPC
-            val filterPtr = 32
-            val filterCnt = epc.length * 4   // bits
-            userHex = r.readData("00000000", RFIDWithUHFBLE.Bank_EPC, filterPtr, filterCnt, epc, 3, 0, 43)
-        } else {
-            // Unfiltered read: read from the tag we just inventoried
-            userHex = r.readData("00000000", 3, 0, 43)
-        }
-
-        Log.d("RFID", "readUserBank epc=$epc useFilter=${targetEpc.isNotBlank()} userHex.len=${userHex?.length}")
+        Log.d("RFID", "readUserBank epc=$epc userHex.len=${userHex?.length}")
         if (userHex.isNullOrBlank()) {
             throw IllegalStateException(
-                "readData returned empty (epc=$epc, bank=3, ptr=0, words=43, pwd=00000000, filtered=${targetEpc.isNotBlank()})"
+                "readData returned empty (epc=$epc, bank=$BANK_USER, ptr=0, words=43, filtered=$hasFilter)"
             )
         }
 
         return mapOf(
-            "userHex" to (userHex?.uppercase() ?: ""),
+            "userHex" to (userHex.uppercase()),
             "epc"     to epc.uppercase(),
             "tid"     to tid.uppercase()
         )
@@ -387,49 +437,39 @@ class MainActivity : FlutterActivity() {
         hexUserBank: String,
         targetEpc: String         // original EPC from scanTagIdentity
     ): Boolean {
-        val r = ensureReader()
-        connectedDeviceAddress = deviceAddress
-        if (!connectDeviceInternal(deviceAddress)) throw IllegalStateException("Reader connect failed")
-
         val normalized = hexUserBank.trim().uppercase()
         if (normalized.length < 4 || normalized.length % 4 != 0) {
             throw IllegalArgumentException("hexUserBank must be multiple of 4 hex chars, got ${normalized.length}")
         }
         val words = normalized.length / 4   // 172 / 4 = 43
 
-        val epc = targetEpc.trim().uppercase()
+        val requestedEpc = targetEpc.trim().replace(" ", "").uppercase()
+        val hasFilter = requestedEpc.isNotBlank()
 
-        val ok: Boolean
+        Log.d("RFID", "writeUserBank: targetEpc=$requestedEpc, words=$words, hex_len=${normalized.length}")
+        Log.d("RFID", "writeUserBank: hex_first48=${normalized.substring(0, minOf(48, normalized.length))}")
+        Log.d("RFID", "writeUserBank: hex_last48=${normalized.substring(maxOf(0, normalized.length - 48))}")
+        
+        // Verify the hex contains the treeId in the first 24 chars (12 bytes = 24 hex chars)
+        val treeIdHexPortion = normalized.substring(0, minOf(24, normalized.length))
+        Log.d("RFID", "writeUserBank: treeId_hex_portion=$treeIdHexPortion")
 
-        if (epc.isNotBlank()) {
-            // ── Filtered write: only write to the tag with this exact EPC ────
-            // filterBank = EPC bank (1)
-            // filterPtr  = 32 (skip 16-bit CRC + 16-bit PC header)
-            // filterCnt  = EPC length in bits (each hex char = 4 bits)
-            // filterData = the EPC hex string
-            // targetBank = USER (3), ptr = 0, cnt = words
-            val filterPtr = 32
-            val filterCnt = epc.length * 4   // bits
-            Log.d("RFID", "writeUserBank (filtered) → epc=$epc words=$words filterCnt=$filterCnt")
+        // Use filtered write when targetEpc is available so we write to the exact scanned tag.
+        val ok = writeDataInternal(
+            deviceAddress = deviceAddress,
+            bank = BANK_USER,            // USER bank
+            ptr = 0,                     // start from word 0
+            len = words,                 // 43 words (86 bytes)
+            pwd = "00000000",            // access pwd
+            data = normalized,           // the hex data
+            useFilter = hasFilter,
+            filterBank = if (hasFilter) BANK_EPC else 0,
+            filterPtr = if (hasFilter) 32 else 0,
+            filterLen = if (hasFilter) (requestedEpc.length * 4) else 0,
+            filterData = if (hasFilter) requestedEpc else ""
+        )
 
-            ok = r.writeData(
-                "00000000",               // access password
-                RFIDWithUHFBLE.Bank_EPC,  // filter bank = EPC
-                filterPtr,                // filter start bit
-                filterCnt,                // filter length in bits
-                epc,                      // filter data = tag's EPC
-                3,                        // target bank = USER
-                0,                        // target start word
-                words,                    // target word count
-                normalized                // data to write
-            )
-        } else {
-            // ── Unfiltered fallback: no EPC provided, write to first tag ─────
-            Log.w("RFID", "writeUserBank (unfiltered) — targetEpc was empty")
-            ok = r.writeData("00000000", 3, 0, words, normalized)
-        }
-
-        Log.d("RFID", "writeUserBank result=$ok")
+        Log.d("RFID", "writeUserBank: final result=$ok")
         return ok
     }
 

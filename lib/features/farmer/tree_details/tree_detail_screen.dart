@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'tree_controller.dart';
@@ -8,11 +9,25 @@ import '../../rfid/rfid_scan_screen.dart';
 
 class TreeDetailScreen extends ConsumerWidget {
   final String treeId;
+  final String source;
 
   const TreeDetailScreen({
     super.key,
     required this.treeId,
+    this.source = 'myTrees',
   });
+
+  void _handleBack(BuildContext context) {
+    if (source == 'rfid') {
+      context.go('/scan');
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/my-trees');
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -20,7 +35,22 @@ class TreeDetailScreen extends ConsumerWidget {
 
     return treeAsync.when(
       data: (doc) {
-        final data = doc.data() as Map<String, dynamic>? ?? {};
+        if (doc == null || !doc.exists) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Tree Details'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => _handleBack(context),
+              ),
+            ),
+            body: const Center(
+              child: Text('Tree not found for this user'),
+            ),
+          );
+        }
+
+        final data = doc.data() ?? {};
 
         final treeIdText = data['treeId']?.toString() ?? 'No ID';
         final location = data['location']?.toString() ?? '';
@@ -33,11 +63,17 @@ class TreeDetailScreen extends ConsumerWidget {
         final health = _statusLabel(data['healthStatus']);
         final lastInspection = _parseDate(data['lastinspectiondate']);
 
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F5F5),
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+            _handleBack(context);
+          },
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF5F5F5),
 
-          body: CustomScrollView(
-            slivers: [
+            body: CustomScrollView(
+              slivers: [
 
               /// ✅ FIXED HEADER (NO OVERFLOW)
               SliverAppBar(
@@ -45,6 +81,10 @@ class TreeDetailScreen extends ConsumerWidget {
                 pinned: true,
                 backgroundColor: Colors.green.shade800,
                 foregroundColor: Colors.white,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => _handleBack(context),
+                ),
 
                 title: const Text(
                   "Tree Details",
@@ -250,37 +290,37 @@ class TreeDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
-
-          /// BUTTONS
-          bottomNavigationBar: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {},
-                    child: const Text("Schedule"),
+            /// BUTTONS
+            bottomNavigationBar: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {},
+                      child: const Text("Schedule"),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            Colors.green),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const RFIDScanScreen(),
-                        ),
-                      );
-                    },
-                    child: const Text("Scan Tag"),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              Colors.green),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const RFIDScanScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text("Scan Tag"),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

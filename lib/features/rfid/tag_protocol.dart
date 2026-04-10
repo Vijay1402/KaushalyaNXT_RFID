@@ -223,3 +223,35 @@ TagData decodeTagData(
     species: species,
   );
 }
+
+/// Extracts the *stored* `treeId` from USER[0..11] as UTF-8.
+///
+/// Returns an empty string when USER[0..11] are all 0x00 or not decodable.
+/// This intentionally does **not** fall back to EPC.
+String decodeTreeIdFromUserHex(String userHex) {
+  final clean = userHex.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
+  var normalized = clean;
+  if (normalized.length.isOdd) {
+    normalized = normalized.padRight(normalized.length + 1, '0');
+  }
+
+  const expectedBytes = 86;
+  const expectedHexLen = expectedBytes * 2;
+  if (normalized.length < expectedHexLen) {
+    normalized = normalized.padRight(expectedHexLen, '0');
+  } else if (normalized.length > expectedHexLen) {
+    normalized = normalized.substring(0, expectedHexLen);
+  }
+
+  final bytes = hexToBytes(normalized);
+  if (bytes.length < 12) return '';
+  final treeRaw = bytes.sublist(0, 12);
+  final firstZero = treeRaw.indexOf(0x00);
+  final treeSlice = firstZero == -1 ? treeRaw : treeRaw.sublist(0, firstZero);
+  if (treeSlice.isEmpty) return '';
+  try {
+    return utf8.decode(treeSlice, allowMalformed: true).trim();
+  } catch (_) {
+    return '';
+  }
+}
