@@ -492,6 +492,104 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     );
   }
 
+  String _firestoreHealthStatus(HealthStatus status) {
+    switch (status) {
+      case HealthStatus.healthy:
+        return '0';
+      case HealthStatus.needsAttention:
+        return '1';
+      case HealthStatus.diseased:
+      case HealthStatus.dead:
+        return '2';
+      case HealthStatus.unknown:
+        return '0';
+    }
+  }
+
+  String _speciesLabel(Species species) {
+    switch (species) {
+      case Species.mango:
+        return 'Mango';
+      case Species.coconut:
+        return 'Coconut';
+      case Species.arecanut:
+        return 'Arecanut';
+      case Species.cashew:
+        return 'Cashew';
+      case Species.unknown:
+        return 'Unknown';
+    }
+  }
+
+  String _monthAbbreviation(DateTime date) {
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return months[date.month - 1];
+  }
+
+  Future<String> _saveTreeToFirestore(TagData data) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw StateError('Please log in before saving trees.');
+    }
+
+    final docId = data.epc.trim().isNotEmpty
+        ? data.epc.trim().toUpperCase()
+        : data.treeId.trim().toUpperCase();
+    if (docId.isEmpty) {
+      throw StateError('Tree document ID is empty.');
+    }
+
+    final treeId = data.treeId.trim().isNotEmpty ? data.treeId.trim() : docId;
+    final inspectionDate = DateTime.fromMillisecondsSinceEpoch(
+      data.lastInspectionUnix * 1000,
+    );
+
+    final docRef = FirebaseFirestore.instance.collection('trees').doc(docId);
+    final snapshot = await docRef.get();
+
+    final payload = <String, dynamic>{
+      'treeId': treeId,
+      'rfid': docId,
+      'rfidTid': data.tid.trim(),
+      'farmerName': data.farmerName.trim(),
+      'ownerName': data.farmerName.trim(),
+      'userId': user.uid,
+      'userEmail': user.email ?? '',
+      'healthStatus': _firestoreHealthStatus(data.healthStatus),
+      'healthStatusName': data.healthStatus.name,
+      'species': _speciesLabel(data.species),
+      'speciesCode': data.species.name,
+      'lastYieldKg': data.lastYieldKg,
+      'treeAge': data.treeAgeYears,
+      'age': data.treeAgeYears,
+      'lastinspectiondate': Timestamp.fromDate(inspectionDate),
+      'harvestMonth': _monthAbbreviation(inspectionDate),
+      'isScanned': true,
+      'location': snapshot.data()?['location'] ?? '',
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (!snapshot.exists) {
+      payload['createdAt'] = FieldValue.serverTimestamp();
+    }
+
+    await docRef.set(payload, SetOptions(merge: true));
+    return docId;
+  }
+
   Future<void> _scanTagFromReader() async {
     final deviceAddress = _selectedDeviceAddress;
     if (deviceAddress == null || deviceAddress.isEmpty) {
@@ -888,20 +986,32 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
 
     final hex = encodeTagData(updated);
     bool ok = false;
+    String? persistenceError;
+    String? savedDocId;
     try {
       ok = await _rfid.writeUserBank(
         deviceAddress: deviceAddress,
         hexUserBank: hex,
         targetEpc: _lastScannedEpc, // write only to the scanned tag EPC
       );
+      if (ok) {
+        savedDocId = await _saveTreeToFirestore(updated);
+      }
     } catch (e) {
-      ok = false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_platformErrorMessage(e, fallback: 'Write failed.')),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (ok) {
+        persistenceError = _platformErrorMessage(
+          e,
+          fallback: 'Firestore save failed.',
+        );
+      } else {
+        ok = false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_platformErrorMessage(e, fallback: 'Write failed.')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
 
     if (!mounted) return;
@@ -916,12 +1026,27 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(ok
-            ? 'Tag written successfully. Click READ when ready.'
+            ? persistenceError == null
+                ? 'Tag written and tree saved successfully.'
+                : 'Tag written, but Firestore save failed: $persistenceError'
             : 'Write failed.'),
-        backgroundColor: ok ? Colors.green : Colors.red,
+        backgroundColor: ok
+            ? (persistenceError == null ? Colors.green : Colors.orange)
+            : Colors.red,
         duration: const Duration(seconds: 3),
       ),
     );
+
+    if (ok && persistenceError == null && savedDocId != null) {
+      Future<void>.delayed(const Duration(milliseconds: 250), () {
+        if (!mounted) return;
+        GoRouter.of(context).pushNamed(
+          'treeDetails',
+          extra: savedDocId!,
+          queryParameters: const {'source': 'rfid'},
+        );
+      });
+    }
   }
 
   Future<void> _showReadWriteChoiceDialog() async {
