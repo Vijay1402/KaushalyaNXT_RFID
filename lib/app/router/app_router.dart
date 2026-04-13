@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
@@ -21,14 +22,24 @@ GoRouter createRouter(Ref ref) {
   final authState = ref.watch(authStateProvider);
 
   return GoRouter(
-    initialLocation: RoutePaths.login,
+    initialLocation: RoutePaths.splash,
     redirect: (context, state) {
       final loggedIn = authState.user != null;
+      final initialized = authState.isInitialized;
       final location = state.matchedLocation;
 
+      final isSplash = location == RoutePaths.splash;
       final isLogin = location == RoutePaths.login;
       final isRegister = location == RoutePaths.register;
       final isForgotPassword = location == RoutePaths.forgotPassword;
+
+      if (!initialized) {
+        return isSplash ? null : RoutePaths.splash;
+      }
+
+      if (isSplash) {
+        return loggedIn ? RoutePaths.farmerHome : RoutePaths.login;
+      }
 
       /// ❌ NOT LOGGED IN → allow only auth screens
       if (!loggedIn && !isLogin && !isRegister && !isForgotPassword) {
@@ -43,6 +54,11 @@ GoRouter createRouter(Ref ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: RoutePaths.splash,
+        builder: (context, state) => const SplashScreen(),
+      ),
+
       /// LOGIN
       GoRoute(
         path: RoutePaths.login,

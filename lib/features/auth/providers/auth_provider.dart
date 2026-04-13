@@ -7,16 +7,24 @@ import '../../../data/models/user_model.dart';
 class AuthState {
   final UserModel? user;
   final bool isLoading;
+  final bool isInitialized;
 
-  AuthState({this.user, this.isLoading = false});
+  AuthState({
+    this.user,
+    this.isLoading = false,
+    this.isInitialized = false,
+  });
 
   AuthState copyWith({
     UserModel? user,
     bool? isLoading,
+    bool? isInitialized,
+    bool clearUser = false,
   }) {
     return AuthState(
-      user: user ?? this.user,
+      user: clearUser ? null : (user ?? this.user),
       isLoading: isLoading ?? this.isLoading,
+      isInitialized: isInitialized ?? this.isInitialized,
     );
   }
 }
@@ -37,7 +45,23 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> checkLogin() async {
     final authService = ref.read(authServiceProvider);
     final cache = ref.read(localCacheServiceProvider);
+    final cachedUser = await cache.getUser();
     final firebaseUser = authService.getCurrentUser();
+
+    final fallbackUser = firebaseUser == null
+        ? null
+        : UserModel(
+            name: (firebaseUser.displayName ?? '').trim(),
+            email: (firebaseUser.email ?? '').trim(),
+            role: 'farmer',
+            phone: '',
+          );
+
+    if (cachedUser != null) {
+      state = AuthState(user: cachedUser);
+    } else if (fallbackUser != null && fallbackUser.email.isNotEmpty) {
+      state = AuthState(user: fallbackUser);
+    }
 
     if (firebaseUser != null) {
       try {
@@ -55,22 +79,18 @@ class AuthController extends StateNotifier<AuthState> {
             phone: (data['phone'] ?? '').toString(),
           );
           await cache.saveUser(user);
-          state = AuthState(user: user);
+          state = AuthState(user: user, isInitialized: true);
           return;
         }
       } catch (_) {
-        final cachedUser = await cache.getUser();
-        if (cachedUser != null) {
-          state = AuthState(user: cachedUser);
+        if (state.user != null) {
+          state = state.copyWith(isInitialized: true);
           return;
         }
       }
     }
 
-    final cachedUser = await cache.getUser();
-    if (cachedUser != null) {
-      state = AuthState(user: cachedUser);
-    }
+    state = state.copyWith(isInitialized: true);
   }
 
   /// LOGIN
@@ -81,11 +101,11 @@ class AuthController extends StateNotifier<AuthState> {
       final user = await ref.read(authServiceProvider).login(email, password);
       await ref.read(localCacheServiceProvider).saveUser(user);
 
-      state = AuthState(user: user, isLoading: false);
-    } on FirebaseAuthException catch (e) {
+      state = AuthState(user: user, isLoading: false, isInitialized: true);
+    } on FirebaseAuthException {
       // ✅ ADD THIS BLOCK
       state = state.copyWith(isLoading: false);
-      throw e; // ✅ pass exact firebase error
+      rethrow; // ✅ pass exact firebase error
     } catch (e) {
       // ✅ MODIFY ONLY THIS PART
       state = state.copyWith(isLoading: false);
@@ -125,7 +145,7 @@ class AuthController extends StateNotifier<AuthState> {
           );
       await ref.read(localCacheServiceProvider).saveUser(user);
 
-      state = AuthState(user: user, isLoading: false);
+      state = AuthState(user: user, isLoading: false, isInitialized: true);
     } catch (e) {
       state = state.copyWith(isLoading: false);
       rethrow;
@@ -140,7 +160,7 @@ class AuthController extends StateNotifier<AuthState> {
       final user = await ref.read(authServiceProvider).signInWithGoogle();
       await ref.read(localCacheServiceProvider).saveUser(user);
 
-      state = AuthState(user: user, isLoading: false);
+      state = AuthState(user: user, isLoading: false, isInitialized: true);
     } catch (e) {
       state = state.copyWith(isLoading: false);
       rethrow;
@@ -161,7 +181,7 @@ class AuthController extends StateNotifier<AuthState> {
             phone: phone,
           );
       await ref.read(localCacheServiceProvider).saveUser(user);
-      state = AuthState(user: user, isLoading: false);
+      state = AuthState(user: user, isLoading: false, isInitialized: true);
     } catch (e) {
       state = state.copyWith(isLoading: false);
       rethrow;
@@ -197,6 +217,6 @@ class AuthController extends StateNotifier<AuthState> {
           .read(localCacheServiceProvider)
           .clearIssueHistory(currentUser.uid);
     }
-    state = AuthState();
+    state = AuthState(isInitialized: true);
   }
 }

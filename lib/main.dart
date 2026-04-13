@@ -14,16 +14,6 @@ void main() async {
 
   await Firebase.initializeApp();
   final container = ProviderContainer();
-  final initialConnectivity = await Connectivity().checkConnectivity();
-  if (initialConnectivity == ConnectivityResult.none) {
-    await FirebaseFirestore.instance.disableNetwork();
-  } else {
-    await FirebaseFirestore.instance.enableNetwork();
-  }
-
-  /// 🔥 AUTO LOGIN
-  await container.read(authStateProvider.notifier).checkLogin();
-  await OfflineSyncService().syncPendingTreeWrites();
 
   runApp(
     UncontrolledProviderScope(
@@ -31,6 +21,23 @@ void main() async {
       child: const MyApp(),
     ),
   );
+
+  unawaited(_bootstrapApp(container));
+}
+
+Future<void> _bootstrapApp(ProviderContainer container) async {
+  final initialConnectivity = await Connectivity().checkConnectivity();
+  if (initialConnectivity == ConnectivityResult.none) {
+    await FirebaseFirestore.instance.disableNetwork();
+  } else {
+    await FirebaseFirestore.instance.enableNetwork();
+  }
+
+  await container.read(authStateProvider.notifier).checkLogin();
+
+  if (initialConnectivity != ConnectivityResult.none) {
+    await OfflineSyncService().syncPendingTreeWrites();
+  }
 }
 
 class MyApp extends ConsumerStatefulWidget {

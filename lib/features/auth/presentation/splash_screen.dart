@@ -1,44 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import '../providers/auth_provider.dart';
 
-class SplashScreen extends ConsumerStatefulWidget {
+class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});
 
   @override
-  ConsumerState<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends ConsumerState<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    checkUser();
-  }
-
-  void checkUser() async {
-    await ref.read(authStateProvider.notifier).checkLogin();
-
-    final user = ref.read(authStateProvider).user;
-
-    if (!mounted) return;
-
-    if (user != null) {
-      if (user.role == 'farmer') {
-        context.go('/farmer');
-      } else {
-        context.go('/kvk');
-      }
-    } else {
-      context.go('/login');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: Colors.green.shade50,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 34,
+              backgroundColor: Colors.green.shade700,
+              child: const Icon(
+                Icons.park_rounded,
+                color: Colors.white,
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Loading your farm data...',
+              style: TextStyle(
+                color: Colors.green.shade900,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const CircularProgressIndicator(),
+          ],
+        ),
+      ),
     );
   }
 }

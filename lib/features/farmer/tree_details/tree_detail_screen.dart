@@ -20,6 +20,8 @@ import '../../../core/services/local_cache_service.dart';
 import '../../../data/models/tree_model.dart';
 import 'tree_controller.dart';
 import '../../rfid/rfid_scan_screen.dart';
+import '../../rfid/rfid_service.dart';
+import '../../rfid/tag_protocol.dart';
 import 'tree_history_screen.dart';
 import 'tree_map_screen.dart';
 import 'tree_photos_screen.dart';
@@ -42,33 +44,126 @@ class TreeDetailScreen extends ConsumerStatefulWidget {
 
 class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
   bool _locationBackfillStarted = false;
-  StreamSubscription<bool>? _connectivitySubscription;
+  ProviderSubscription<AsyncValue<bool>>? _connectivitySubscription;
+  final RfidService _rfid = RfidService();
+  final Map<String, Future<Map<String, dynamic>?>> _tagDataFutures = {};
 
   @override
   void initState() {
     super.initState();
+    _tagDataFutures.clear();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(treeIssueControllerProvider).syncPendingIssues();
     });
-    _connectivitySubscription =
-        ref.read(connectivityStatusProvider.stream).listen((isOnline) {
-      if (isOnline) {
-        ref.read(treeIssueControllerProvider).syncPendingIssues();
-      }
-    });
+    _connectivitySubscription = ref.listenManual<AsyncValue<bool>>(
+      connectivityStatusProvider,
+      (_, next) {
+        if (next.value == true) {
+          ref.read(treeIssueControllerProvider).syncPendingIssues();
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
-    _connectivitySubscription?.cancel();
+    _connectivitySubscription?.close();
     super.dispose();
   }
 
-  Future<Map<String, dynamic>?> _loadTagData(String treeId) async {
+  Map<String, dynamic> _tagDataToLocalMap(
+    TagData data, {
+    String? userHex,
+  }) {
+    return <String, dynamic>{
+      'epc': data.epc,
+      'tid': data.tid,
+      'treeId': data.treeId,
+      'farmerName': data.farmerName,
+      'lastInspectionUnix': data.lastInspectionUnix,
+      'healthStatus': data.healthStatus.index,
+      'lastYieldKg': data.lastYieldKg,
+      'treeAgeYears': data.treeAgeYears,
+      'species': data.species.index,
+      if (userHex != null && userHex.isNotEmpty) 'userHex': userHex,
+      'savedAt': DateTime.now().toIso8601String(),
+    };
+  }
+
+  Future<Map<String, dynamic>?> _loadTagData(
+    String treeId, {
+    String expectedRfid = '',
+  }) async {
     final firebaseUser = ref.read(authServiceProvider).getCurrentUser();
     final userId = firebaseUser?.uid ?? '';
     if (userId.isEmpty) return null;
-    return LocalCacheService().getWrittenTagByTreeId(userId, treeId);
+
+    final cache = LocalCacheService();
+    final localTag = await cache.getWrittenTagByTreeId(userId, treeId);
+    final readerAddress = RFIDScanScreen.rememberedDeviceAddress;
+    if (readerAddress == null || readerAddress.isEmpty) {
+      return localTag;
+    }
+
+    try {
+      final connected = await _rfid.connectDevice(readerAddress);
+      if (!connected) return localTag;
+
+      final tagIdentity = await _rfid.scanTagIdentity(
+        deviceAddress: readerAddress,
+        timeoutMs: 6000,
+      );
+      final epc = (tagIdentity['epc'] ?? '').trim().toUpperCase();
+      final tid = (tagIdentity['tid'] ?? '').trim().toUpperCase();
+      if (epc.isEmpty) return localTag;
+
+      final payload = await _rfid.readUserBank(
+        deviceAddress: readerAddress,
+        targetEpc: epc,
+      );
+      final userHex = (payload['userHex'] ?? '').trim();
+      if (userHex.isEmpty) {
+        return await cache.getWrittenTagByEpc(userId, epc) ?? localTag;
+      }
+
+      final tagData = decodeTagData(
+        userHex,
+        verifyCrc: false,
+        epc: epc,
+        tid: tid,
+      );
+      final tagMap = _tagDataToLocalMap(tagData, userHex: userHex);
+      await cache.saveWrittenTag(userId, tagMap);
+
+      final normalizedTreeId = treeId.trim().toLowerCase();
+      final normalizedExpectedRfid = expectedRfid.trim().toUpperCase();
+      final matchesTreeId =
+          tagData.treeId.trim().toLowerCase() == normalizedTreeId;
+      final matchesRfid =
+          normalizedExpectedRfid.isNotEmpty && epc == normalizedExpectedRfid;
+
+      if (matchesTreeId || matchesRfid) {
+        return tagMap;
+      }
+
+      return localTag ?? tagMap;
+    } catch (_) {
+      return localTag;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _getTagDataFuture(
+    String treeId, {
+    String expectedRfid = '',
+  }) {
+    final key = '$treeId|$expectedRfid';
+    return _tagDataFutures.putIfAbsent(
+      key,
+      () => _loadTagData(
+        treeId,
+        expectedRfid: expectedRfid,
+      ),
+    );
   }
 
   String _tagHealthLabel(dynamic rawStatus) {
@@ -305,6 +400,7 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
             }
 
             Future<void> submitIssue() async {
+              final messenger = ScaffoldMessenger.of(context);
               if (isSubmitting) return;
               setSheet(() => isSubmitting = true);
               try {
@@ -317,9 +413,9 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
                       note: noteController.text,
                       imagePath: pickedImage?.path,
                     );
-                if (!mounted) return;
+                if (!mounted || !ctx.mounted) return;
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   SnackBar(
                     content: const Text(
                       'Issue saved and will sync automatically.',
@@ -329,7 +425,7 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
                 );
               } catch (_) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   const SnackBar(
                     content: Text('Failed to submit issue. Please try again.'),
                   ),
@@ -497,8 +593,10 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
     Position? position;
     try {
       position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 12),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 12),
+        ),
       );
     } catch (_) {
       position = await Geolocator.getLastKnownPosition();
@@ -804,7 +902,10 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
                               child: SizedBox(
                                 height: 250,
                                 child: FutureBuilder<Map<String, dynamic>?>(
-                                  future: _loadTagData(treeIdText),
+                                  future: _getTagDataFuture(
+                                    treeIdText,
+                                    expectedRfid: rfid,
+                                  ),
                                   builder: (context, tagSnapshot) {
                                     final tagData = tagSnapshot.data;
                                     final hasTagData = tagData != null;
@@ -1051,7 +1152,7 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
                           ),
                         );
                       },
-                      child: const Text("Scan Tag"),
+                      child: const Text("Update"),
                     ),
                   ),
                 ],

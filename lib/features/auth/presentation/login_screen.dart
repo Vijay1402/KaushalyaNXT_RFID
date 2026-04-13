@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../app/router/route_paths.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -21,9 +22,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   String? passwordError;
 
   bool isValidEmail(String email) {
-    return RegExp(
-            r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$")
-        .hasMatch(email);
+    return RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$").hasMatch(email);
   }
 
   @override
@@ -104,13 +103,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                         ),
                         onPressed: () async {
-                          final messenger =
-                              ScaffoldMessenger.of(context);
+                          final messenger = ScaffoldMessenger.of(context);
+                          final router = GoRouter.of(context);
 
-                          final email =
-                              emailController.text.trim();
-                          final password =
-                              passwordController.text.trim();
+                          final email = emailController.text.trim();
+                          final password = passwordController.text.trim();
 
                           /// RESET ERRORS
                           setState(() {
@@ -134,8 +131,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             passwordError = "Password is required";
                             isValid = false;
                           } else if (password.length < 6) {
-                            passwordError =
-                                "Minimum 6 characters required";
+                            passwordError = "Minimum 6 characters required";
                             isValid = false;
                           }
 
@@ -149,16 +145,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 .login(email, password);
                             if (!mounted) return;
 
-                            final user =
-                                ref.read(authStateProvider).user;     
-                          
+                            final user = ref.read(authStateProvider).user;
+
                             if (user != null) {
-  
-                              if (user.role == 'farmer') {
-                                context.go('/farmer');
-                              } else {
-                                context.go('/kvk');
-                              }
+                              router.go(RoutePaths.farmerHome);
                             }
                           } on FirebaseAuthException catch (e) {
                             /// 🔴 CLEAN ERROR MESSAGES
@@ -166,24 +156,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                             switch (e.code) {
                               case 'user-not-found':
-                                message =
-                                    "No user found with this email";
+                                message = "No user found with this email";
                                 break;
                               case 'wrong-password':
-                                message =
-                                    "Incorrect password";
+                                message = "Incorrect password";
                                 break;
                               case 'invalid-email':
-                                message =
-                                    "Invalid email format";
+                                message = "Invalid email format";
                                 break;
                               case 'invalid-credential':
-                                message =
-                                    "Invalid email or password";
+                                message = "Invalid email or password";
                                 break;
                               default:
-                                message =
-                                    e.message ?? "Login failed";
+                                message = e.message ?? "Login failed";
                             }
 
                             messenger.showSnackBar(
@@ -193,27 +178,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             );
                           } catch (e) {
+                            String message = "Invalid email or password";
 
-                              String message = "Invalid email or password";
+                            final error = e.toString().toLowerCase();
 
-                              final error = e.toString().toLowerCase();
-
-                              if (error.contains('user-not-found')) {
+                            if (error.contains('user-not-found')) {
                               message = "No user found with this email";
-                              } else if (error.contains('wrong-password')) {
-                                message = "Incorrect password";
-                              } else if (error.contains('invalid-email')) {
-                                message = "Invalid email format";
-                              } else if (error.contains('invalid-credential')) {
-                                message = "Invalid email or password";
-                              }
+                            } else if (error.contains('wrong-password')) {
+                              message = "Incorrect password";
+                            } else if (error.contains('invalid-email')) {
+                              message = "Invalid email format";
+                            } else if (error.contains('invalid-credential')) {
+                              message = "Invalid email or password";
+                            }
 
-                               messenger.showSnackBar( // ✅ SAFE
-                                  SnackBar(
-                                    content: Text(message),
-                                    backgroundColor: Colors.red,
-                                  ),
-                               );
+                            messenger.showSnackBar(
+                              // ✅ SAFE
+                              SnackBar(
+                                content: Text(message),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
                           }
                         },
                         child: const Text(
@@ -292,24 +277,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             decoration: InputDecoration(
               hintText: hint,
               border: InputBorder.none,
-              prefixIcon:
-                  isPassword ? const Icon(Icons.lock_outline) : null,
+              prefixIcon: isPassword ? const Icon(Icons.lock_outline) : null,
               suffixIcon: isPassword
                   ? IconButton(
                       icon: Icon(
-                        obscure
-                            ? Icons.visibility_off
-                            : Icons.visibility,
+                        obscure ? Icons.visibility_off : Icons.visibility,
                       ),
                       onPressed: onToggle,
                     )
                   : null,
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 14),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             ),
           ),
         ),
-
         if (errorText != null)
           Padding(
             padding: const EdgeInsets.only(top: 5, left: 5),

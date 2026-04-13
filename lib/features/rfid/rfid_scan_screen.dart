@@ -14,7 +14,6 @@ import 'tag_protocol.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/router/route_paths.dart';
 import '../../core/services/local_cache_service.dart';
-import '../../core/services/offline_sync_service.dart';
 import '../farmer/tree_details/tree_controller.dart';
 
 // ── States the scan screen moves through ─────────────────────────────────────
@@ -32,6 +31,11 @@ enum _ScanState {
 
 class RFIDScanScreen extends StatefulWidget {
   const RFIDScanScreen({super.key});
+
+  static String? get rememberedDeviceAddress =>
+      _RFIDScanScreenState._rememberedDeviceAddress;
+  static String? get rememberedDeviceName =>
+      _RFIDScanScreenState._rememberedDeviceName;
 
   @override
   State<RFIDScanScreen> createState() => _RFIDScanScreenState();
@@ -649,8 +653,10 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     Position? position;
     try {
       position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 12),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 12),
+        ),
       );
     } catch (_) {
       position = await Geolocator.getLastKnownPosition();
@@ -857,9 +863,10 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   }
 
   Future<void> _scanTagFromReader() async {
+    final messenger = ScaffoldMessenger.of(context);
     final deviceAddress = _selectedDeviceAddress;
     if (deviceAddress == null || deviceAddress.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
             content: Text('Reader not connected. Press SCAN again.')),
       );
@@ -902,7 +909,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       _pulseCtrl.stop();
       _spinCtrl.stop();
       setState(() => _state = _ScanState.connectedWaitingTag);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('Tag not recognized. Press trigger and try again.'),
         ),
@@ -926,7 +933,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
           .timeout(const Duration(seconds: 8));
     } catch (e) {
       payload = <String, String>{};
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(
             _platformErrorMessage(
@@ -983,7 +990,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
             treeAgeYears: 0,
             species: Species.unknown,
           );
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(
             _platformErrorMessage(
@@ -1034,14 +1041,78 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       _tagDataByEpc[_lastScannedEpc.toUpperCase()] = tagData;
       _tagHasUserData = _hasValidUserData(tagData);
 
-      // Navigate to "My Trees" using the Tree ID stored in USER[0..11] (no EPC fallback).
+      if (!mounted) return;
+      await _showReadTagDialog(tagData);
+      if (!mounted) return;
+      setState(() => _state = _ScanState.tagReady);
+    } catch (e) {
+      final localTag = await _getWrittenTagFromLocal(
+        epc: _lastScannedEpc,
+        treeId: _lastTagData?.treeId,
+      );
+      if (localTag != null) {
+        _lastTagData = localTag;
+        _tagDataByEpc[_lastScannedEpc.toUpperCase()] = localTag;
+        _tagHasUserData = _hasValidUserData(localTag);
+
+        if (!mounted) return;
+        await _showReadTagDialog(localTag);
+        if (!mounted) return;
+        setState(() => _state = _ScanState.tagReady);
+        return;
+      }
+
+      // Re-read can fail if the tag moved out of range. If we already decoded
+      // data from the latest scan, keep flow smooth by showing cached details.
+      final cached = _lastTagData;
+      if (cached != null) {
+        await _showReadTagDialog(cached);
+        if (!mounted) return;
+        setState(() => _state = _ScanState.tagReady);
+        return;
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Read failed: $e')),
+      );
+      setState(() => _state = _ScanState.tagReady);
+    }
+  }
+
+  Future<void> _onReadNavigatePressed() async {
+    if (_lastScannedEpc.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Press SCAN TAG first.')),
+      );
+      return;
+    }
+
+    setState(() => _state = _ScanState.reading);
+
+    try {
+      final userHex = await _rfid.readUserBank(
+        deviceAddress: _selectedDeviceAddress ?? '',
+        targetEpc: _lastScannedEpc,
+      );
+
+      final userHexValue = userHex['userHex'] ?? '';
+      final tagData = decodeTagData(
+        userHexValue,
+        epc: _lastScannedEpc,
+        tid: _lastScannedTid,
+      );
+      await _saveWrittenTagLocally(tagData, userHex: userHexValue);
+
+      _lastTagData = tagData;
+      _tagDataByEpc[_lastScannedEpc.toUpperCase()] = tagData;
+      _tagHasUserData = _hasValidUserData(tagData);
+
       final storedTreeId = decodeTreeIdFromUserHex(userHexValue).trim();
       if (storedTreeId.isNotEmpty) {
         await _openTreeFromTreeId(storedTreeId);
         return;
       }
 
-      // No treeId stored; show the read dialog with tag data
       if (!mounted) return;
       await _showReadTagDialog(tagData);
       if (!mounted) return;
@@ -1069,8 +1140,6 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
         return;
       }
 
-      // Re-read can fail if the tag moved out of range. If we already decoded
-      // data from the latest scan, keep flow smooth by using cached treeId.
       final cached = _lastTagData;
       if (cached != null) {
         final fallbackTreeId = cached.treeId.trim();
@@ -1078,7 +1147,13 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
           await _openTreeFromTreeId(fallbackTreeId);
           return;
         }
+
+        await _showReadTagDialog(cached);
+        if (!mounted) return;
+        setState(() => _state = _ScanState.tagReady);
+        return;
       }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Read failed: $e')),
@@ -1243,17 +1318,19 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   }
 
   Future<void> _onWritePressed() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
     final deviceAddress = _selectedDeviceAddress;
     final base = _lastTagData;
 
     if (deviceAddress == null || deviceAddress.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Please connect to the reader first.')),
       );
       return;
     }
     if (base == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Press SCAN TAG first.')),
       );
       return;
@@ -1311,7 +1388,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     } catch (e) {
       if (!ok) {
         ok = false;
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(_platformErrorMessage(e, fallback: 'Write failed.')),
             backgroundColor: Colors.red,
@@ -1335,7 +1412,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     setState(() => _state = _ScanState.tagReady);
 
     // Show final result
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       SnackBar(
         content: Text(
           ok
@@ -1352,7 +1429,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     if (ok && savedDocId != null) {
       Future<void>.delayed(const Duration(milliseconds: 250), () {
         if (!mounted) return;
-        GoRouter.of(context).pushNamed(
+        router.pushNamed(
           'treeDetails',
           extra: savedDocId!,
           queryParameters: const {'source': 'rfid'},
@@ -1402,13 +1479,17 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     final nowUnix = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final bool doPrefill = prefillUserData && initial != null;
     final firebaseUser = FirebaseAuth.instance.currentUser;
-    final defaultUserName = (firebaseUser?.displayName ?? '').trim().isNotEmpty
-        ? firebaseUser!.displayName!.trim()
-        : ((firebaseUser?.email ?? '').contains('@')
-            ? firebaseUser!.email!.split('@').first
-            : '');
+    final cachedUser = await LocalCacheService().getUser();
+    final registeredUserName =
+        (firebaseUser?.displayName ?? '').trim().isNotEmpty
+            ? firebaseUser!.displayName!.trim()
+            : (cachedUser?.name.trim().isNotEmpty ?? false)
+                ? cachedUser!.name.trim()
+                : ((firebaseUser?.email ?? '').contains('@')
+                    ? firebaseUser!.email!.split('@').first
+                    : '');
 
-    String farmerText = defaultUserName;
+    String farmerText = registeredUserName;
     String yieldText = '';
     String ageText = '';
     HealthStatus health = HealthStatus.unknown;
@@ -1419,7 +1500,6 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     String treeIdText = ''; // Start blank; user enters custom treeId
     if (doPrefill) {
       // `doPrefill` implies `initial != null`
-      farmerText = initial.farmerName;
       yieldText = initial.lastYieldKg.toStringAsFixed(1);
       ageText = initial.treeAgeYears.toString();
       health = initial.healthStatus;
@@ -1436,6 +1516,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     final yieldController = TextEditingController(text: yieldText);
     final ageController = TextEditingController(text: ageText);
     final treeIdController = TextEditingController(text: treeIdText);
+    if (!mounted) return null;
 
     return showDialog<TagData>(
       context: context,
@@ -1451,9 +1532,10 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
                   children: [
                     TextField(
                       controller: farmerController,
+                      readOnly: true,
                       decoration: const InputDecoration(
-                        labelText: 'Farmer Name / Owner',
-                        hintText: 'R. Kumar',
+                        labelText: 'Farmer Name',
+                        hintText: 'Registered farmer name',
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -1982,9 +2064,9 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _onReadPressed,
+                    onPressed: _onReadNavigatePressed,
                     icon: const Icon(Icons.download_rounded),
-                    label: const Text('READ'),
+                    label: const Text('VIEW DETAILS'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       foregroundColor: Colors.white,

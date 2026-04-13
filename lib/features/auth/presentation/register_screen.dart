@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../app/router/route_paths.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -161,6 +162,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ),
                         onPressed: () async {
                           final messenger = ScaffoldMessenger.of(context);
+                          final router = GoRouter.of(context);
 
                           final phone = phoneController.text.trim();
                           final email = emailController.text.trim();
@@ -226,7 +228,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   content: Text("Registered Successfully")),
                             );
 
-                            context.go('/farmer');
+                            router.go(RoutePaths.farmerHome);
                           } catch (e) {
                             messenger.showSnackBar(
                               SnackBar(content: Text(e.toString())),
