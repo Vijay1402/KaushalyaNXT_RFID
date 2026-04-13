@@ -9,6 +9,9 @@ class LocalCacheService {
   static const String _cachedUserKey = 'cached_user';
   static const String _treeCachePrefix = 'cached_trees_';
   static const String _writtenTagPrefix = 'written_tag_';
+  static const String _pendingTreeSyncPrefix = 'pending_tree_sync_';
+  static const String _pendingIssuePrefix = 'pending_issues_';
+  static const String _issueHistoryPrefix = 'issue_history_';
 
   Future<void> saveUser(UserModel user) async {
     final prefs = await SharedPreferences.getInstance();
@@ -18,6 +21,7 @@ class LocalCacheService {
         'name': user.name,
         'email': user.email,
         'role': user.role,
+        'phone': user.phone,
       }),
     );
   }
@@ -33,6 +37,7 @@ class LocalCacheService {
         name: (data['name'] ?? '').toString(),
         email: (data['email'] ?? '').toString(),
         role: (data['role'] ?? 'farmer').toString(),
+        phone: (data['phone'] ?? '').toString(),
       );
     } catch (_) {
       return null;
@@ -206,6 +211,226 @@ class LocalCacheService {
     for (final key in keys) {
       await prefs.remove(key);
     }
+  }
+
+  Future<void> enqueuePendingTreeSync(
+    String userId,
+    Map<String, dynamic> tree,
+  ) async {
+    final docId = (tree['_docId'] ?? '').toString();
+    if (docId.isEmpty) return;
+
+    final pending = await getPendingTreeSyncs(userId);
+    final updated = <Map<String, dynamic>>[];
+    var replaced = false;
+
+    for (final item in pending) {
+      if ((item['_docId'] ?? '').toString() == docId) {
+        updated.add(tree);
+        replaced = true;
+      } else {
+        updated.add(item);
+      }
+    }
+
+    if (!replaced) {
+      updated.add(tree);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      '$_pendingTreeSyncPrefix$userId',
+      jsonEncode(_sanitizeValue(updated)),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingTreeSyncs(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('$_pendingTreeSyncPrefix$userId');
+    if (raw == null || raw.isEmpty) return const [];
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map>()
+          .map(
+            (item) => item.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          )
+          .cast<Map<String, dynamic>>()
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> removePendingTreeSync(String userId, String docId) async {
+    final pending = await getPendingTreeSyncs(userId);
+    final updated = pending
+        .where((item) => (item['_docId'] ?? '').toString() != docId)
+        .toList(growable: false);
+
+    final prefs = await SharedPreferences.getInstance();
+    if (updated.isEmpty) {
+      await prefs.remove('$_pendingTreeSyncPrefix$userId');
+      return;
+    }
+
+    await prefs.setString(
+      '$_pendingTreeSyncPrefix$userId',
+      jsonEncode(_sanitizeValue(updated)),
+    );
+  }
+
+  Future<void> clearPendingTreeSyncs(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_pendingTreeSyncPrefix$userId');
+  }
+
+  Future<void> savePendingIssue(
+    String userId,
+    Map<String, dynamic> issueData,
+  ) async {
+    final reportId = (issueData['reportId'] ?? '').toString().trim();
+    if (reportId.isEmpty) return;
+
+    final issues = await getPendingIssues(userId);
+    final updated = <Map<String, dynamic>>[];
+    var replaced = false;
+
+    for (final item in issues) {
+      if ((item['reportId'] ?? '').toString() == reportId) {
+        updated.add(issueData);
+        replaced = true;
+      } else {
+        updated.add(item);
+      }
+    }
+
+    if (!replaced) {
+      updated.add(issueData);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      '$_pendingIssuePrefix$userId',
+      jsonEncode(_sanitizeValue(updated)),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingIssues(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('$_pendingIssuePrefix$userId');
+    if (raw == null || raw.isEmpty) return const [];
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map>()
+          .map(
+            (item) => item.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          )
+          .cast<Map<String, dynamic>>()
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> removePendingIssue(String userId, String reportId) async {
+    final issues = await getPendingIssues(userId);
+    final updated = issues
+        .where((issue) => (issue['reportId'] ?? '').toString() != reportId)
+        .toList(growable: false);
+
+    final prefs = await SharedPreferences.getInstance();
+    if (updated.isEmpty) {
+      await prefs.remove('$_pendingIssuePrefix$userId');
+      return;
+    }
+
+    await prefs.setString(
+      '$_pendingIssuePrefix$userId',
+      jsonEncode(_sanitizeValue(updated)),
+    );
+  }
+
+  Future<void> clearPendingIssues(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_pendingIssuePrefix$userId');
+  }
+
+  Future<void> saveIssueHistoryEntry(
+    String userId,
+    Map<String, dynamic> issueData,
+  ) async {
+    final reportId = (issueData['reportId'] ?? '').toString().trim();
+    if (reportId.isEmpty) return;
+
+    final history = await getIssueHistory(userId);
+    final updated = <Map<String, dynamic>>[];
+    var replaced = false;
+
+    for (final item in history) {
+      if ((item['reportId'] ?? '').toString() == reportId) {
+        updated.add(issueData);
+        replaced = true;
+      } else {
+        updated.add(item);
+      }
+    }
+
+    if (!replaced) {
+      updated.add(issueData);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      '$_issueHistoryPrefix$userId',
+      jsonEncode(_sanitizeValue(updated)),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getIssueHistory(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('$_issueHistoryPrefix$userId');
+    if (raw == null || raw.isEmpty) return const [];
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map>()
+          .map(
+            (item) => item.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          )
+          .cast<Map<String, dynamic>>()
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getIssueHistoryForTree(
+    String userId,
+    String treeDocId,
+  ) async {
+    final history = await getIssueHistory(userId);
+    return history.where((item) {
+      return (item['treeDocId'] ?? '').toString().trim() == treeDocId.trim();
+    }).toList(growable: false);
+  }
+
+  Future<void> clearIssueHistory(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_issueHistoryPrefix$userId');
   }
 
   dynamic _sanitizeValue(dynamic value) {

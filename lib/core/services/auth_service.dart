@@ -35,6 +35,7 @@ class AuthService {
         name: data['name'] ?? '',
         email: data['email'] ?? '',
         role: data['role'] ?? 'farmer',
+        phone: data['phone'] ?? '',
       );
     } on FirebaseAuthException catch (e) {
       throw Exception(e.message ?? "Login failed");
@@ -47,6 +48,7 @@ class AuthService {
     required String email,
     required String password,
     required String role,
+    required String phone,
   }) async {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
@@ -63,12 +65,14 @@ class AuthService {
         'name': name,
         'email': email,
         'role': role,
+        'phone': phone,
       });
 
       return UserModel(
         name: name,
         email: email,
         role: role,
+        phone: phone,
       );
     } on FirebaseAuthException catch (e) {
       throw Exception(e.message ?? "Registration failed");
@@ -107,6 +111,7 @@ class AuthService {
           'name': user.displayName ?? '',
           'email': user.email ?? '',
           'role': 'farmer',
+          'phone': '',
         });
       }
 
@@ -114,6 +119,7 @@ class AuthService {
         name: user.displayName ?? '',
         email: user.email ?? '',
         role: 'farmer',
+        phone: '',
       );
     } catch (e) {
       throw Exception(e.toString());
@@ -123,5 +129,57 @@ class AuthService {
   /// 🚪 LOGOUT
   Future<void> logout() async {
     await _auth.signOut();
+  }
+
+  Future<UserModel> updateProfile({
+    required String name,
+    required String email,
+    required String phone,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception("User not logged in");
+
+      final currentDoc =
+          await firestore.collection('users').doc(user.uid).get();
+      final currentData = currentDoc.data() ?? <String, dynamic>{};
+      final normalizedName = name.trim();
+      final normalizedEmail = email.trim();
+      final normalizedPhone = phone.trim();
+      final currentRole = (currentData['role'] ?? 'farmer').toString();
+
+      if (normalizedEmail.isNotEmpty && normalizedEmail != (user.email ?? '')) {
+        await user.verifyBeforeUpdateEmail(normalizedEmail);
+      }
+
+      if (normalizedName.isNotEmpty &&
+          normalizedName != (user.displayName ?? '')) {
+        await user.updateDisplayName(normalizedName);
+      }
+
+      await firestore.collection('users').doc(user.uid).set({
+        'name': normalizedName,
+        'email': normalizedEmail,
+        'role': currentRole,
+        'phone': normalizedPhone,
+      }, SetOptions(merge: true));
+
+      return UserModel(
+        name: normalizedName,
+        email: normalizedEmail,
+        role: currentRole,
+        phone: normalizedPhone,
+      );
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? "Profile update failed");
+    }
+  }
+
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? "Password reset failed");
+    }
   }
 }

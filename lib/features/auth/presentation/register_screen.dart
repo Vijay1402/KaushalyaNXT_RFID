@@ -12,6 +12,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final nameController = TextEditingController();
+  final phoneController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
@@ -22,6 +23,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String role = "farmer";
 
   /// 🔴 ERROR VARIABLES
+  String? phoneError;
   String? emailError;
   String? passwordError;
   String? confirmError;
@@ -66,6 +68,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 child: Column(
                   children: [
                     _inputField(nameController, "Full Name"),
+
+                    const SizedBox(height: 15),
+
+                    _inputField(
+                      phoneController,
+                      "Phone Number",
+                      keyboardType: TextInputType.phone,
+                      errorText: phoneError,
+                    ),
 
                     const SizedBox(height: 15),
 
@@ -151,18 +162,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         onPressed: () async {
                           final messenger = ScaffoldMessenger.of(context);
 
+                          final phone = phoneController.text.trim();
                           final email = emailController.text.trim();
                           final password = passwordController.text.trim();
                           final confirm = confirmPasswordController.text.trim();
 
                           /// RESET ERRORS
                           setState(() {
+                            phoneError = null;
                             emailError = null;
                             passwordError = null;
                             confirmError = null;
                           });
 
                           bool isValid = true;
+
+                          if (phone.isEmpty) {
+                            phoneError = "Phone number is required";
+                            isValid = false;
+                          } else if (!RegExp(r'^\d{10}$').hasMatch(phone)) {
+                            phoneError = "Enter valid 10 digit number";
+                            isValid = false;
+                          }
 
                           /// EMAIL VALIDATION
                           if (email.isEmpty) {
@@ -195,6 +216,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   email: email,
                                   password: password,
                                   role: role,
+                                  phone: phone,
                                 );
 
                             if (!mounted) return;
@@ -251,6 +273,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     bool obscure = false,
     VoidCallback? onToggle,
     String? errorText,
+    TextInputType? keyboardType,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,6 +281,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         TextField(
           controller: controller,
           obscureText: obscure,
+          keyboardType: keyboardType,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,

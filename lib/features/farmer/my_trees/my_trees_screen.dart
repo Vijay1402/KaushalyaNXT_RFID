@@ -279,8 +279,51 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
                                 ],
                               ),
                             ),
-                            Text(health,
-                                style: TextStyle(color: _healthColor(health)))
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  health,
+                                  style: TextStyle(color: _healthColor(health)),
+                                ),
+                                const SizedBox(height: 6),
+                                Consumer(
+                                  builder: (context, ref, _) {
+                                    final syncAsync = ref.watch(
+                                      treeSyncStatusProvider(
+                                        treeDocIdOf(docs[i]),
+                                      ),
+                                    );
+                                    final isSynced = syncAsync.value ?? true;
+
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSynced
+                                            ? Colors.green
+                                                .withValues(alpha: 0.12)
+                                            : Colors.orange
+                                                .withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        isSynced ? 'Synced' : 'Local only',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: isSynced
+                                              ? Colors.green.shade800
+                                              : Colors.orange.shade800,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),

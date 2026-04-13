@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../../core/services/local_cache_service.dart';
+import '../../../core/providers/connectivity_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 
 const String treeDocIdField = '_docId';
@@ -15,6 +19,19 @@ final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
   return FirebaseAuth.instance;
 });
 
+final firebaseStorageProvider = Provider<FirebaseStorage>((ref) {
+  return FirebaseStorage.instance;
+});
+
+final treeIssueControllerProvider = Provider<TreeIssueController>((ref) {
+  return TreeIssueController(
+    firestore: ref.read(firestoreProvider),
+    auth: ref.read(firebaseAuthProvider),
+    storage: ref.read(firebaseStorageProvider),
+    cache: ref.read(localCacheServiceProvider),
+  );
+});
+
 class _TreeOwnerQuery {
   final String field;
   final Object value;
@@ -23,6 +40,140 @@ class _TreeOwnerQuery {
     required this.field,
     required this.value,
   });
+}
+
+class TreeIssueController {
+  TreeIssueController({
+    required FirebaseFirestore firestore,
+    required FirebaseAuth auth,
+    required FirebaseStorage storage,
+    required LocalCacheService cache,
+  })  : _firestore = firestore,
+        _auth = auth,
+        _storage = storage,
+        _cache = cache;
+
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
+  final FirebaseStorage _storage;
+  final LocalCacheService _cache;
+
+  Future<void> reportIssue({
+    required String treeDocId,
+    required String treeId,
+    required String species,
+    required String healthStatus,
+    String? ownerName,
+    String? note,
+    String? imagePath,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('User must be logged in to report an issue');
+    }
+
+    final trimmedTreeDocId = treeDocId.trim();
+    if (trimmedTreeDocId.isEmpty) {
+      throw ArgumentError('Tree document id is required');
+    }
+
+    final reportId = _firestore
+        .collection('trees')
+        .doc(trimmedTreeDocId)
+        .collection('issues')
+        .doc()
+        .id;
+
+    final issueData = <String, dynamic>{
+      'reportId': reportId,
+      'treeDocId': trimmedTreeDocId,
+      'treeId': treeId.trim(),
+      'species': species.trim(),
+      'healthStatus': healthStatus.trim(),
+      'ownerName': ownerName?.trim() ?? '',
+      'note': note?.trim() ?? '',
+      'localImagePath': imagePath?.trim() ?? '',
+      'status': 'open',
+      'reportedByUid': user.uid,
+      'reportedByEmail': user.email?.trim() ?? '',
+      'createdAtLocal': DateTime.now().toIso8601String(),
+    };
+
+    await _cache.savePendingIssue(user.uid, issueData);
+    await _cache.saveIssueHistoryEntry(user.uid, issueData);
+    await syncPendingIssues();
+  }
+
+  Future<void> syncPendingIssues() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final issues = await _cache.getPendingIssues(user.uid);
+    for (final issue in issues) {
+      try {
+        await _syncSinglePendingIssue(user.uid, issue);
+      } catch (_) {
+        // Keep pending when network/storage is unavailable.
+      }
+    }
+  }
+
+  Future<void> _syncSinglePendingIssue(
+    String userId,
+    Map<String, dynamic> issue,
+  ) async {
+    final treeDocId = (issue['treeDocId'] ?? '').toString().trim();
+    final reportId = (issue['reportId'] ?? '').toString().trim();
+    if (treeDocId.isEmpty || reportId.isEmpty) return;
+
+    var imageUrl = (issue['imageUrl'] ?? '').toString().trim();
+    final localImagePath = (issue['localImagePath'] ?? '').toString().trim();
+    if (imageUrl.isEmpty && localImagePath.isNotEmpty) {
+      final imageFile = File(localImagePath);
+      if (await imageFile.exists()) {
+        final extension = localImagePath.contains('.')
+            ? localImagePath.substring(localImagePath.lastIndexOf('.'))
+            : '.jpg';
+        final storageRef = _storage.ref().child(
+              'tree_issue_reports/$userId/$treeDocId/$reportId$extension',
+            );
+        await storageRef.putFile(imageFile);
+        imageUrl = await storageRef.getDownloadURL();
+      }
+    }
+
+    await _firestore
+        .collection('trees')
+        .doc(treeDocId)
+        .collection('issues')
+        .doc(reportId)
+        .set({
+      'reportId': reportId,
+      'treeDocId': treeDocId,
+      'treeId': (issue['treeId'] ?? '').toString(),
+      'species': (issue['species'] ?? '').toString(),
+      'healthStatus': (issue['healthStatus'] ?? '').toString(),
+      'ownerName': (issue['ownerName'] ?? '').toString(),
+      'note': (issue['note'] ?? '').toString(),
+      'hasImage': imageUrl.isNotEmpty,
+      'imageUrl': imageUrl,
+      'localImagePath': localImagePath,
+      'status': (issue['status'] ?? 'open').toString(),
+      'reportedByUid': (issue['reportedByUid'] ?? '').toString(),
+      'reportedByEmail': (issue['reportedByEmail'] ?? '').toString(),
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    await _cache.saveIssueHistoryEntry(userId, {
+      ...issue,
+      'imageUrl': imageUrl,
+      'hasImage': imageUrl.isNotEmpty,
+      'syncedAtLocal': DateTime.now().toIso8601String(),
+    });
+
+    await _cache.removePendingIssue(userId, reportId);
+  }
 }
 
 const List<String> _uidOwnerFields = <String>[
@@ -165,6 +316,14 @@ final treesProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>(
       yield cachedTrees;
     }
 
+    final isOnline = ref.watch(connectivityStatusProvider).value ?? true;
+    if (!isOnline) {
+      if (cachedTrees.isEmpty) {
+        yield const [];
+      }
+      return;
+    }
+
     try {
       final ownerQuery = await _resolveTreeOwnerQuery(
         firestore: firestore,
@@ -207,6 +366,12 @@ final treeByIdProvider =
       yield cachedTree;
     }
 
+    final isOnline = ref.watch(connectivityStatusProvider).value ?? true;
+    if (!isOnline) {
+      yield cachedTree;
+      return;
+    }
+
     try {
       await for (final doc
           in firestore.collection('trees').doc(id).snapshots()) {
@@ -230,3 +395,13 @@ final treeByIdProvider =
     }
   },
 );
+
+final treeSyncStatusProvider =
+    FutureProvider.autoDispose.family<bool, String>((ref, docId) async {
+  final user = ref.read(firebaseAuthProvider).currentUser;
+  if (user == null || docId.trim().isEmpty) return true;
+
+  final pending =
+      await ref.read(localCacheServiceProvider).getPendingTreeSyncs(user.uid);
+  return !pending.any((item) => treeDocIdOf(item) == docId);
+});

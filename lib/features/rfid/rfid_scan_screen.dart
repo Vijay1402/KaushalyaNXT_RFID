@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -13,6 +14,7 @@ import 'tag_protocol.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/router/route_paths.dart';
 import '../../core/services/local_cache_service.dart';
+import '../../core/services/offline_sync_service.dart';
 import '../farmer/tree_details/tree_controller.dart';
 
 // ── States the scan screen moves through ─────────────────────────────────────
@@ -67,6 +69,11 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   late Animation<double> _spinAnim;
 
   static const double _unknownCoordinate = 0.0;
+
+  Future<bool> _isOnline() async {
+    final result = await Connectivity().checkConnectivity();
+    return result != ConnectivityResult.none;
+  }
 
   @override
   void initState() {
@@ -718,12 +725,21 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     );
 
     final docRef = FirebaseFirestore.instance.collection('trees').doc(docId);
-    final snapshot = await docRef.get();
-    String locationName = snapshot.data()?['location']?.toString() ?? '';
-    double latitude = (snapshot.data()?['latitude'] as num?)?.toDouble() ??
-        _unknownCoordinate;
-    double longitude = (snapshot.data()?['longitude'] as num?)?.toDouble() ??
-        _unknownCoordinate;
+    DocumentSnapshot<Map<String, dynamic>>? snapshot;
+    String locationName = '';
+    double latitude = _unknownCoordinate;
+    double longitude = _unknownCoordinate;
+
+    try {
+      snapshot = await docRef.get();
+      locationName = snapshot.data()?['location']?.toString() ?? '';
+      latitude = (snapshot.data()?['latitude'] as num?)?.toDouble() ??
+          _unknownCoordinate;
+      longitude = (snapshot.data()?['longitude'] as num?)?.toDouble() ??
+          _unknownCoordinate;
+    } catch (_) {
+      // Offline or Firestore unavailable. Continue with local save.
+    }
 
     try {
       final currentLocation = await _fetchDeviceLocation();
@@ -758,11 +774,10 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
-    if (!snapshot.exists) {
+    if (!(snapshot?.exists ?? false)) {
       payload['createdAt'] = FieldValue.serverTimestamp();
     }
 
-    await docRef.set(payload, SetOptions(merge: true));
     final cachePayload = Map<String, dynamic>.from(payload)
       ..['updatedAt'] = DateTime.now().toIso8601String();
     if (cachePayload['createdAt'] is FieldValue) {
@@ -771,6 +786,72 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     await LocalCacheService().saveTree(
       user.uid,
       treeWithDocId(docId, cachePayload),
+    );
+
+    await docRef.set(payload, SetOptions(merge: true));
+
+    return docId;
+  }
+
+  Future<String> _saveTreeLocally(TagData data) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw StateError('Please log in before saving trees.');
+    }
+
+    final docId = data.epc.trim().isNotEmpty
+        ? data.epc.trim().toUpperCase()
+        : data.treeId.trim().toUpperCase();
+    if (docId.isEmpty) {
+      throw StateError('Tree document ID is empty.');
+    }
+
+    final treeId = data.treeId.trim().isNotEmpty ? data.treeId.trim() : docId;
+    final inspectionDate = DateTime.fromMillisecondsSinceEpoch(
+      data.lastInspectionUnix * 1000,
+    );
+
+    final payload = <String, dynamic>{
+      'treeId': treeId,
+      'rfid': docId,
+      'rfidTid': data.tid.trim(),
+      'farmerName': data.farmerName.trim(),
+      'ownerName': data.farmerName.trim(),
+      'userId': user.uid,
+      'userEmail': user.email ?? '',
+      'healthStatus': _firestoreHealthStatus(data.healthStatus),
+      'healthStatusName': data.healthStatus.name,
+      'species': _speciesLabel(data.species),
+      'speciesCode': data.species.name,
+      'lastYieldKg': data.lastYieldKg,
+      'treeAge': data.treeAgeYears,
+      'age': data.treeAgeYears,
+      'lastinspectiondate': inspectionDate.toIso8601String(),
+      'harvestMonth': _monthAbbreviation(inspectionDate),
+      'isScanned': true,
+      'location': '',
+      'latitude': _unknownCoordinate,
+      'longitude': _unknownCoordinate,
+      'updatedAt': DateTime.now().toIso8601String(),
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      final currentLocation = await _fetchDeviceLocation();
+      payload['location'] = currentLocation.locationName;
+      payload['latitude'] = currentLocation.latitude;
+      payload['longitude'] = currentLocation.longitude;
+    } catch (_) {
+      // Local save should still continue when location is unavailable.
+    }
+
+    await LocalCacheService().saveTree(
+      user.uid,
+      treeWithDocId(docId, payload),
+    );
+    await LocalCacheService().enqueuePendingTreeSync(
+      user.uid,
+      treeWithDocId(docId, payload),
     );
     return docId;
   }
@@ -1198,6 +1279,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     bool ok = false;
     String? persistenceError;
     String? savedDocId;
+    final online = await _isOnline();
     try {
       ok = await _rfid.writeUserBank(
         deviceAddress: deviceAddress,
@@ -1205,21 +1287,40 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
         targetEpc: _lastScannedEpc, // write only to the scanned tag EPC
       );
       if (ok) {
-        savedDocId = await _saveTreeToFirestore(updated);
+        savedDocId = await _saveTreeLocally(updated);
+        if (online) {
+          try {
+            await _saveTreeToFirestore(updated);
+            final currentUser = FirebaseAuth.instance.currentUser;
+            if (currentUser != null) {
+              await LocalCacheService().removePendingTreeSync(
+                currentUser.uid,
+                savedDocId,
+              );
+            }
+          } catch (e) {
+            persistenceError = _platformErrorMessage(
+              e,
+              fallback: 'Saved locally. Sync pending.',
+            );
+          }
+        } else {
+          persistenceError = 'Saved locally. Sync pending.';
+        }
       }
     } catch (e) {
-      if (ok) {
-        persistenceError = _platformErrorMessage(
-          e,
-          fallback: 'Firestore save failed.',
-        );
-      } else {
+      if (!ok) {
         ok = false;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_platformErrorMessage(e, fallback: 'Write failed.')),
             backgroundColor: Colors.red,
           ),
+        );
+      } else {
+        persistenceError = _platformErrorMessage(
+          e,
+          fallback: 'Saved locally. Sync pending.',
         );
       }
     }
@@ -1236,19 +1337,19 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     // Show final result
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok
-            ? persistenceError == null
-                ? 'Tag written and tree saved successfully.'
-                : 'Tag written, but Firestore save failed: $persistenceError'
-            : 'Write failed.'),
-        backgroundColor: ok
-            ? (persistenceError == null ? Colors.green : Colors.orange)
-            : Colors.red,
+        content: Text(
+          ok
+              ? persistenceError == null
+                  ? 'Tag written successfully.'
+                  : 'Tag written successfully. $persistenceError'
+              : 'Write failed.',
+        ),
+        backgroundColor: ok ? Colors.green : Colors.red,
         duration: const Duration(seconds: 3),
       ),
     );
 
-    if (ok && persistenceError == null && savedDocId != null) {
+    if (ok && savedDocId != null) {
       Future<void>.delayed(const Duration(milliseconds: 250), () {
         if (!mounted) return;
         GoRouter.of(context).pushNamed(

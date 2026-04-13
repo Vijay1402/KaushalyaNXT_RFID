@@ -52,6 +52,7 @@ class AuthController extends StateNotifier<AuthState> {
             name: data['name'],
             email: data['email'],
             role: data['role'],
+            phone: (data['phone'] ?? '').toString(),
           );
           await cache.saveUser(user);
           state = AuthState(user: user);
@@ -110,6 +111,7 @@ class AuthController extends StateNotifier<AuthState> {
     required String email,
     required String password,
     required String role,
+    required String phone,
   }) async {
     state = state.copyWith(isLoading: true);
 
@@ -119,6 +121,7 @@ class AuthController extends StateNotifier<AuthState> {
             email: email,
             password: password,
             role: role,
+            phone: phone,
           );
       await ref.read(localCacheServiceProvider).saveUser(user);
 
@@ -144,6 +147,36 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void> updateProfile({
+    required String name,
+    required String email,
+    required String phone,
+  }) async {
+    state = state.copyWith(isLoading: true);
+
+    try {
+      final user = await ref.read(authServiceProvider).updateProfile(
+            name: name,
+            email: email,
+            phone: phone,
+          );
+      await ref.read(localCacheServiceProvider).saveUser(user);
+      state = AuthState(user: user, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
+  }
+
+  Future<void> sendPasswordReset() async {
+    final email = state.user?.email.trim() ?? '';
+    if (email.isEmpty) {
+      throw Exception('No email found for this account');
+    }
+
+    await ref.read(authServiceProvider).sendPasswordResetEmail(email);
+  }
+
   /// LOGOUT
   Future<void> logout() async {
     final currentUser = ref.read(authServiceProvider).getCurrentUser();
@@ -151,7 +184,18 @@ class AuthController extends StateNotifier<AuthState> {
     await ref.read(localCacheServiceProvider).clearUser();
     if (currentUser != null) {
       await ref.read(localCacheServiceProvider).clearTrees(currentUser.uid);
-      await ref.read(localCacheServiceProvider).clearWrittenTags(currentUser.uid);
+      await ref
+          .read(localCacheServiceProvider)
+          .clearWrittenTags(currentUser.uid);
+      await ref
+          .read(localCacheServiceProvider)
+          .clearPendingTreeSyncs(currentUser.uid);
+      await ref
+          .read(localCacheServiceProvider)
+          .clearPendingIssues(currentUser.uid);
+      await ref
+          .read(localCacheServiceProvider)
+          .clearIssueHistory(currentUser.uid);
     }
     state = AuthState();
   }
