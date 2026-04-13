@@ -1,0 +1,33 @@
+{
+  "configurations": [
+    {
+      "name": "Windows",
+      "compilerPath": "cl.exe",
+      "intelliSenseMode": "msvc-x64",
+      "includePath": [
+        "${workspaceFolder}/windows/flutter",
+        "${workspaceFolder}/windows",
+        "${workspaceFolder}/windows/runner",
+        "${workspaceFolder}/windows/third_party/flutter/include",
+        "${workspaceFolder}/windows/flutter/ephemeral/.plugin_symlinks/cloud_firestore/windows/include",
+        "${workspaceFolder}/windows/flutter/ephemeral/.plugin_symlinks/connectivity_plus/windows/include",
+        "${workspaceFolder}/windows/flutter/ephemeral/.plugin_symlinks/file_selector_windows/windows/include",
+        "${workspaceFolder}/windows/flutter/ephemeral/.plugin_symlinks/firebase_auth/windows/include",
+        "${workspaceFolder}/windows/flutter/ephemeral/.plugin_symlinks/firebase_core/windows/include",
+        "${workspaceFolder}/windows/flutter/ephemeral/.plugin_symlinks/geolocator_windows/windows/include",
+        "${workspaceFolder}/windows/flutter/ephemeral/.plugin_symlinks/image_picker_windows/windows/include",
+        "${env:USERPROFILE}/REon/flutter/bin/cache/artifacts/engine/windows-x64/cpp_client_wrapper/include",
+        "${env:USERPROFILE}/REon/flutter/bin/cache/artifacts/engine/windows-x64",
+        "${env:USERPROFILE}/REon/flutter/bin/cache/artifacts/engine/windows-x64-release",
+        "${env:USERPROFILE}/REon/flutter/bin/cache/artifacts/engine/windows-x64-profile"
+      ],
+      "defines": [
+        "UNICODE",
+        "_UNICODE"
+      ],
+      "cStandard": "c17",
+      "cppStandard": "c++17"
+    }
+  ],
+  "version": 4
+}
