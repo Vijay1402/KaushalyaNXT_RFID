@@ -9,6 +9,8 @@ class LocalCacheService {
   static const String _cachedUserKey = 'cached_user';
   static const String _treeCachePrefix = 'cached_trees_';
   static const String _writtenTagPrefix = 'written_tag_';
+  static const String _scanHistoryPrefix = 'scan_history_';
+  static const String _pendingScanHistoryPrefix = 'pending_scan_history_';
   static const String _pendingTreeSyncPrefix = 'pending_tree_sync_';
   static const String _pendingIssuePrefix = 'pending_issues_';
   static const String _issueHistoryPrefix = 'issue_history_';
@@ -144,7 +146,7 @@ class LocalCacheService {
     if (epc.isEmpty) return;
 
     await prefs.setString(
-      '$_writtenTagPrefix$userId\_$epc',
+      '$_writtenTagPrefix${userId}_$epc',
       jsonEncode(_sanitizeValue(tagData)),
     );
   }
@@ -154,7 +156,7 @@ class LocalCacheService {
     String epc,
   ) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = '$_writtenTagPrefix$userId\_${epc.trim().toUpperCase()}';
+    final key = '$_writtenTagPrefix${userId}_${epc.trim().toUpperCase()}';
     final raw = prefs.getString(key);
     if (raw == null || raw.isEmpty) return null;
 
@@ -178,7 +180,7 @@ class LocalCacheService {
 
     final prefs = await SharedPreferences.getInstance();
     for (final key in prefs.getKeys()) {
-      if (!key.startsWith('$_writtenTagPrefix$userId\_')) continue;
+      if (!key.startsWith('$_writtenTagPrefix${userId}_')) continue;
       final raw = prefs.getString(key);
       if (raw == null || raw.isEmpty) continue;
 
@@ -201,16 +203,176 @@ class LocalCacheService {
     return null;
   }
 
+  Future<List<Map<String, dynamic>>> getWrittenTags(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final tags = <Map<String, dynamic>>[];
+
+    for (final key in prefs.getKeys()) {
+      if (!key.startsWith('$_writtenTagPrefix${userId}_')) continue;
+      final raw = prefs.getString(key);
+      if (raw == null || raw.isEmpty) continue;
+
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is! Map) continue;
+        tags.add(
+          decoded.map(
+            (innerKey, value) => MapEntry(innerKey.toString(), value),
+          ),
+        );
+      } catch (_) {
+        // Ignore malformed local entries.
+      }
+    }
+
+    return tags;
+  }
+
   Future<void> clearWrittenTags(String userId) async {
     final prefs = await SharedPreferences.getInstance();
     final keys = prefs
         .getKeys()
-        .where((key) => key.startsWith('$_writtenTagPrefix$userId\_'))
+        .where((key) => key.startsWith('$_writtenTagPrefix${userId}_'))
         .toList(growable: false);
 
     for (final key in keys) {
       await prefs.remove(key);
     }
+  }
+
+  Future<void> saveScanHistoryEntry(
+    String userId,
+    Map<String, dynamic> entry,
+  ) async {
+    final scanId = (entry['scanId'] ?? '').toString().trim();
+    if (scanId.isEmpty) return;
+
+    final history = await getScanHistory(userId);
+    final updated = <Map<String, dynamic>>[];
+    var replaced = false;
+
+    for (final item in history) {
+      if ((item['scanId'] ?? '').toString() == scanId) {
+        updated.add(entry);
+        replaced = true;
+      } else {
+        updated.add(item);
+      }
+    }
+
+    if (!replaced) {
+      updated.add(entry);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      '$_scanHistoryPrefix$userId',
+      jsonEncode(_sanitizeValue(updated)),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getScanHistory(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('$_scanHistoryPrefix$userId');
+    if (raw == null || raw.isEmpty) return const [];
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map>()
+          .map(
+            (item) => item.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          )
+          .cast<Map<String, dynamic>>()
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> enqueuePendingScanHistory(
+    String userId,
+    Map<String, dynamic> entry,
+  ) async {
+    final scanId = (entry['scanId'] ?? '').toString().trim();
+    if (scanId.isEmpty) return;
+
+    final pending = await getPendingScanHistory(userId);
+    final updated = <Map<String, dynamic>>[];
+    var replaced = false;
+
+    for (final item in pending) {
+      if ((item['scanId'] ?? '').toString() == scanId) {
+        updated.add(entry);
+        replaced = true;
+      } else {
+        updated.add(item);
+      }
+    }
+
+    if (!replaced) {
+      updated.add(entry);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      '$_pendingScanHistoryPrefix$userId',
+      jsonEncode(_sanitizeValue(updated)),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingScanHistory(
+      String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('$_pendingScanHistoryPrefix$userId');
+    if (raw == null || raw.isEmpty) return const [];
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map>()
+          .map(
+            (item) => item.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          )
+          .cast<Map<String, dynamic>>()
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> removePendingScanHistory(String userId, String scanId) async {
+    final pending = await getPendingScanHistory(userId);
+    final updated = pending
+        .where((item) => (item['scanId'] ?? '').toString() != scanId)
+        .toList(growable: false);
+
+    final prefs = await SharedPreferences.getInstance();
+    if (updated.isEmpty) {
+      await prefs.remove('$_pendingScanHistoryPrefix$userId');
+      return;
+    }
+
+    await prefs.setString(
+      '$_pendingScanHistoryPrefix$userId',
+      jsonEncode(_sanitizeValue(updated)),
+    );
+  }
+
+  Future<void> clearScanHistory(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_scanHistoryPrefix$userId');
+  }
+
+  Future<void> clearPendingScanHistory(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_pendingScanHistoryPrefix$userId');
   }
 
   Future<void> enqueuePendingTreeSync(

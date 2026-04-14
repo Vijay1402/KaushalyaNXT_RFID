@@ -209,6 +209,12 @@ class AuthController extends StateNotifier<AuthState> {
           .clearWrittenTags(currentUser.uid);
       await ref
           .read(localCacheServiceProvider)
+          .clearScanHistory(currentUser.uid);
+      await ref
+          .read(localCacheServiceProvider)
+          .clearPendingScanHistory(currentUser.uid);
+      await ref
+          .read(localCacheServiceProvider)
           .clearPendingTreeSyncs(currentUser.uid);
       await ref
           .read(localCacheServiceProvider)

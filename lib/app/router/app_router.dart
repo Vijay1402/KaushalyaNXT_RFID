@@ -8,6 +8,7 @@ import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/local_storage_viewer_screen.dart';
 import '../../features/farmer/dashboard/farmer_dashboard.dart';
+import '../../features/farmer/dashboard/activity_log_screen.dart';
 import '../../features/farmer/my_trees/my_trees_screen.dart';
 import '../../features/farmer/profile/profile_screen.dart';
 import '../../features/rfid/rfid_scan_screen.dart';
@@ -81,6 +82,11 @@ GoRouter createRouter(Ref ref) {
       GoRoute(
         path: RoutePaths.farmerHome,
         builder: (context, state) => const FarmerDashboard(),
+      ),
+
+      GoRoute(
+        path: RoutePaths.activityLog,
+        builder: (context, state) => const ActivityLogScreen(),
       ),
 
       /// MY TREES

@@ -20,8 +20,6 @@ import '../../../core/services/local_cache_service.dart';
 import '../../../data/models/tree_model.dart';
 import 'tree_controller.dart';
 import '../../rfid/rfid_scan_screen.dart';
-import '../../rfid/rfid_service.dart';
-import '../../rfid/tag_protocol.dart';
 import 'tree_history_screen.dart';
 import 'tree_map_screen.dart';
 import 'tree_photos_screen.dart';
@@ -45,7 +43,6 @@ class TreeDetailScreen extends ConsumerStatefulWidget {
 class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
   bool _locationBackfillStarted = false;
   ProviderSubscription<AsyncValue<bool>>? _connectivitySubscription;
-  final RfidService _rfid = RfidService();
   final Map<String, Future<Map<String, dynamic>?>> _tagDataFutures = {};
 
   @override
@@ -71,97 +68,58 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
     super.dispose();
   }
 
-  Map<String, dynamic> _tagDataToLocalMap(
-    TagData data, {
-    String? userHex,
-  }) {
-    return <String, dynamic>{
-      'epc': data.epc,
-      'tid': data.tid,
-      'treeId': data.treeId,
-      'farmerName': data.farmerName,
-      'lastInspectionUnix': data.lastInspectionUnix,
-      'healthStatus': data.healthStatus.index,
-      'lastYieldKg': data.lastYieldKg,
-      'treeAgeYears': data.treeAgeYears,
-      'species': data.species.index,
-      if (userHex != null && userHex.isNotEmpty) 'userHex': userHex,
-      'savedAt': DateTime.now().toIso8601String(),
-    };
-  }
-
   Future<Map<String, dynamic>?> _loadTagData(
-    String treeId, {
-    String expectedRfid = '',
+    Map<String, dynamic> treeData, {
+    required bool isOnline,
   }) async {
     final firebaseUser = ref.read(authServiceProvider).getCurrentUser();
     final userId = firebaseUser?.uid ?? '';
     if (userId.isEmpty) return null;
 
     final cache = LocalCacheService();
-    final localTag = await cache.getWrittenTagByTreeId(userId, treeId);
-    final readerAddress = RFIDScanScreen.rememberedDeviceAddress;
-    if (readerAddress == null || readerAddress.isEmpty) {
-      return localTag;
-    }
+    final treeId = (treeData['treeId'] ?? '').toString().trim();
+    final rfid = (treeData['rfid'] ?? treeDocIdOf(treeData))
+        .toString()
+        .trim()
+        .toUpperCase();
 
-    try {
-      final connected = await _rfid.connectDevice(readerAddress);
-      if (!connected) return localTag;
-
-      final tagIdentity = await _rfid.scanTagIdentity(
-        deviceAddress: readerAddress,
-        timeoutMs: 6000,
-      );
-      final epc = (tagIdentity['epc'] ?? '').trim().toUpperCase();
-      final tid = (tagIdentity['tid'] ?? '').trim().toUpperCase();
-      if (epc.isEmpty) return localTag;
-
-      final payload = await _rfid.readUserBank(
-        deviceAddress: readerAddress,
-        targetEpc: epc,
-      );
-      final userHex = (payload['userHex'] ?? '').trim();
-      if (userHex.isEmpty) {
-        return await cache.getWrittenTagByEpc(userId, epc) ?? localTag;
-      }
-
-      final tagData = decodeTagData(
-        userHex,
-        verifyCrc: false,
-        epc: epc,
-        tid: tid,
-      );
-      final tagMap = _tagDataToLocalMap(tagData, userHex: userHex);
-      await cache.saveWrittenTag(userId, tagMap);
-
-      final normalizedTreeId = treeId.trim().toLowerCase();
-      final normalizedExpectedRfid = expectedRfid.trim().toUpperCase();
-      final matchesTreeId =
-          tagData.treeId.trim().toLowerCase() == normalizedTreeId;
-      final matchesRfid =
-          normalizedExpectedRfid.isNotEmpty && epc == normalizedExpectedRfid;
-
-      if (matchesTreeId || matchesRfid) {
+    if (isOnline) {
+      final tagMap = tagSnapshotFromTree(treeData);
+      if (tagMap != null && rfid.isNotEmpty) {
+        await cache.saveWrittenTag(userId, tagMap);
         return tagMap;
       }
+    }
 
-      return localTag ?? tagMap;
-    } catch (_) {
+    final localTag = await cache.getWrittenTagByTreeId(userId, treeId);
+    if (localTag != null) {
       return localTag;
     }
+    if (rfid.isEmpty) {
+      return null;
+    }
+    return cache.getWrittenTagByEpc(userId, rfid);
   }
 
   Future<Map<String, dynamic>?> _getTagDataFuture(
-    String treeId, {
-    String expectedRfid = '',
+    Map<String, dynamic> treeData, {
+    required bool isOnline,
   }) {
-    final key = '$treeId|$expectedRfid';
+    final key = [
+      treeDocIdOf(treeData),
+      (treeData['treeId'] ?? '').toString(),
+      (treeData['rfid'] ?? '').toString(),
+      (treeData['updatedAt'] ?? '').toString(),
+      (treeData['lastinspectiondate'] ?? '').toString(),
+      (treeData['healthStatus'] ?? '').toString(),
+      (treeData['lastYieldKg'] ?? '').toString(),
+      isOnline ? 'online' : 'offline',
+    ].join('|');
     return _tagDataFutures.putIfAbsent(
       key,
       () => _loadTagData(
-        treeId,
-        expectedRfid: expectedRfid,
+        treeData,
+        isOnline: isOnline,
       ),
     );
   }
@@ -903,8 +861,8 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
                                 height: 250,
                                 child: FutureBuilder<Map<String, dynamic>?>(
                                   future: _getTagDataFuture(
-                                    treeIdText,
-                                    expectedRfid: rfid,
+                                    data,
+                                    isOnline: isOnline,
                                   ),
                                   builder: (context, tagSnapshot) {
                                     final tagData = tagSnapshot.data;
@@ -1095,20 +1053,26 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
                           _row("Longitude", longitudeText),
                           if (latitude != null && longitude != null) ...[
                             const SizedBox(height: 12),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => TreeMapScreen(
-                                      lat: latitude,
-                                      lng: longitude,
-                                      title: '$treeIdText Location',
+                            _miniMap(latitude, longitude),
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => TreeMapScreen(
+                                        lat: latitude,
+                                        lng: longitude,
+                                        title: '$treeIdText Location',
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                              child: _miniMap(latitude, longitude),
+                                  );
+                                },
+                                icon: const Icon(Icons.open_in_full_rounded),
+                                label: const Text('Open Full Map'),
+                              ),
                             ),
                           ],
                         ]),
@@ -1259,7 +1223,7 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
             initialCenter: point,
             initialZoom: 15,
             interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.none,
+              flags: InteractiveFlag.all,
             ),
           ),
           children: [

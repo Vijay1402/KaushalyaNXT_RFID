@@ -474,40 +474,6 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     return text.isEmpty ? fallback : text;
   }
 
-  Future<void> _openTreeFromTreeId(String treeId) async {
-    final normalizedTreeId = treeId.trim();
-    if (normalizedTreeId.isEmpty || !mounted) return;
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        final docId = await findOwnedTreeDocumentIdByTreeId(
-          firestore: FirebaseFirestore.instance,
-          user: user,
-          treeId: normalizedTreeId,
-        );
-
-        if (!mounted) return;
-        if (docId != null) {
-          GoRouter.of(context).pushNamed(
-            'treeDetails',
-            extra: docId,
-            queryParameters: const {'source': 'rfid'},
-          );
-          return;
-        }
-      } catch (_) {
-        // Fall back to My Trees below if direct lookup fails.
-      }
-    }
-
-    if (!mounted) return;
-    GoRouter.of(context).pushNamed(
-      'myTrees',
-      queryParameters: {'treeId': normalizedTreeId},
-    );
-  }
-
   String _firestoreHealthStatus(HealthStatus status) {
     switch (status) {
       case HealthStatus.healthy:
@@ -609,6 +575,109 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       user.uid,
       _tagDataToLocalMap(data, userHex: userHex),
     );
+  }
+
+  String _scanHistoryHealthLabel(HealthStatus status) {
+    switch (status) {
+      case HealthStatus.healthy:
+        return 'Healthy';
+      case HealthStatus.needsAttention:
+        return 'Needs Attention';
+      case HealthStatus.diseased:
+      case HealthStatus.dead:
+        return 'Critical';
+      case HealthStatus.unknown:
+        return '';
+    }
+  }
+
+  Future<Map<String, dynamic>?> _cachedTreeForScanHistory(
+    String userId,
+    TagData data,
+  ) async {
+    final cache = LocalCacheService();
+    final epcDocId = data.epc.trim().toUpperCase();
+    if (epcDocId.isNotEmpty) {
+      final byDocId = await cache.getTreeByDocId(userId, epcDocId);
+      if (byDocId != null) return byDocId;
+    }
+
+    final treeId = data.treeId.trim();
+    if (treeId.isEmpty) return null;
+
+    final cachedDocId = await cache.findTreeDocIdByTreeId(userId, treeId);
+    if (cachedDocId == null || cachedDocId.isEmpty) return null;
+    return cache.getTreeByDocId(userId, cachedDocId);
+  }
+
+  Future<Map<String, dynamic>> _scanHistoryEntryFromTag(
+    String userId,
+    TagData data,
+  ) async {
+    final nowIso = DateTime.now().toIso8601String();
+    final normalizedTreeId = data.treeId.trim().isNotEmpty
+        ? data.treeId.trim()
+        : data.epc.trim().toUpperCase();
+    final normalizedEpc = data.epc.trim().toUpperCase();
+    final scanId =
+        '${DateTime.now().millisecondsSinceEpoch}_${normalizedEpc.isEmpty ? normalizedTreeId : normalizedEpc}';
+
+    final cachedTree = await _cachedTreeForScanHistory(userId, data);
+    final cachedHealthStatusName =
+        (cachedTree?['healthStatusName'] ?? '').toString().trim();
+    final healthStatus = cachedHealthStatusName.isNotEmpty
+        ? cachedHealthStatusName
+        : _scanHistoryHealthLabel(data.healthStatus);
+    final latitude = (cachedTree?['latitude'] as num?)?.toDouble();
+    final longitude = (cachedTree?['longitude'] as num?)?.toDouble();
+    final rfid = (cachedTree?['rfid'] ?? normalizedEpc).toString().trim();
+
+    return <String, dynamic>{
+      'scanId': scanId,
+      'treeId': normalizedTreeId,
+      'rfid': rfid,
+      'epc': normalizedEpc,
+      'tid': data.tid.trim().toUpperCase(),
+      'healthstatus': healthStatus,
+      'latitude': latitude ?? '',
+      'longitude': longitude ?? '',
+      'date': nowIso,
+      'savedAt': nowIso,
+      'source': 'rfid_scan',
+    };
+  }
+
+  Future<void> _saveScanHistory(TagData data) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final cache = LocalCacheService();
+    final entry = await _scanHistoryEntryFromTag(user.uid, data);
+    await cache.saveScanHistoryEntry(user.uid, entry);
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('scan_history')
+          .doc((entry['scanId'] ?? '').toString())
+          .set({
+        'scanId': (entry['scanId'] ?? '').toString(),
+        'treeId': (entry['treeId'] ?? '').toString(),
+        'rfid': (entry['rfid'] ?? '').toString(),
+        'epc': (entry['epc'] ?? '').toString(),
+        'tid': (entry['tid'] ?? '').toString(),
+        'healthstatus': (entry['healthstatus'] ?? '').toString(),
+        'latitude': entry['latitude'],
+        'longitude': entry['longitude'],
+        'date': FieldValue.serverTimestamp(),
+        'savedAtLocal': (entry['savedAt'] ?? '').toString(),
+        'savedAt': FieldValue.serverTimestamp(),
+        'source': (entry['source'] ?? 'rfid_scan').toString(),
+        'userId': user.uid,
+        'userEmail': user.email ?? '',
+      }, SetOptions(merge: true));
+    } catch (_) {
+      await cache.enqueuePendingScanHistory(user.uid, entry);
+    }
   }
 
   Future<TagData?> _getWrittenTagFromLocal({
@@ -1005,6 +1074,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     _lastTagData = tagData;
     _tagHasUserData = _hasValidUserData(tagData);
     _tagDataByEpc[epc.toUpperCase()] = tagData;
+    await _saveScanHistory(tagData);
 
     setState(() => _state = _ScanState.tagReady);
     HapticFeedback.heavyImpact();
@@ -1071,89 +1141,6 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
         setState(() => _state = _ScanState.tagReady);
         return;
       }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Read failed: $e')),
-      );
-      setState(() => _state = _ScanState.tagReady);
-    }
-  }
-
-  Future<void> _onReadNavigatePressed() async {
-    if (_lastScannedEpc.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Press SCAN TAG first.')),
-      );
-      return;
-    }
-
-    setState(() => _state = _ScanState.reading);
-
-    try {
-      final userHex = await _rfid.readUserBank(
-        deviceAddress: _selectedDeviceAddress ?? '',
-        targetEpc: _lastScannedEpc,
-      );
-
-      final userHexValue = userHex['userHex'] ?? '';
-      final tagData = decodeTagData(
-        userHexValue,
-        epc: _lastScannedEpc,
-        tid: _lastScannedTid,
-      );
-      await _saveWrittenTagLocally(tagData, userHex: userHexValue);
-
-      _lastTagData = tagData;
-      _tagDataByEpc[_lastScannedEpc.toUpperCase()] = tagData;
-      _tagHasUserData = _hasValidUserData(tagData);
-
-      final storedTreeId = decodeTreeIdFromUserHex(userHexValue).trim();
-      if (storedTreeId.isNotEmpty) {
-        await _openTreeFromTreeId(storedTreeId);
-        return;
-      }
-
-      if (!mounted) return;
-      await _showReadTagDialog(tagData);
-      if (!mounted) return;
-      setState(() => _state = _ScanState.tagReady);
-    } catch (e) {
-      final localTag = await _getWrittenTagFromLocal(
-        epc: _lastScannedEpc,
-        treeId: _lastTagData?.treeId,
-      );
-      if (localTag != null) {
-        _lastTagData = localTag;
-        _tagDataByEpc[_lastScannedEpc.toUpperCase()] = localTag;
-        _tagHasUserData = _hasValidUserData(localTag);
-
-        final localTreeId = localTag.treeId.trim();
-        if (localTreeId.isNotEmpty) {
-          await _openTreeFromTreeId(localTreeId);
-          return;
-        }
-
-        if (!mounted) return;
-        await _showReadTagDialog(localTag);
-        if (!mounted) return;
-        setState(() => _state = _ScanState.tagReady);
-        return;
-      }
-
-      final cached = _lastTagData;
-      if (cached != null) {
-        final fallbackTreeId = cached.treeId.trim();
-        if (fallbackTreeId.isNotEmpty) {
-          await _openTreeFromTreeId(fallbackTreeId);
-          return;
-        }
-
-        await _showReadTagDialog(cached);
-        if (!mounted) return;
-        setState(() => _state = _ScanState.tagReady);
-        return;
-      }
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Read failed: $e')),
@@ -2064,9 +2051,9 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _onReadNavigatePressed,
+                    onPressed: _onReadPressed,
                     icon: const Icon(Icons.download_rounded),
-                    label: const Text('VIEW DETAILS'),
+                    label: const Text('READ'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       foregroundColor: Colors.white,

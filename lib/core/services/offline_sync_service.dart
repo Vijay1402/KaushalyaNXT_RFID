@@ -66,6 +66,31 @@ class OfflineSyncService {
             );
         await _cache.removePendingTreeSync(user.uid, docId);
       }
+
+      final pendingScans = await _cache.getPendingScanHistory(user.uid);
+      for (final scan in pendingScans) {
+        final scanId = (scan['scanId'] ?? '').toString().trim();
+        if (scanId.isEmpty) continue;
+
+        await _firestore.collection('scan_history').doc(scanId).set({
+          'scanId': scanId,
+          'treeId': (scan['treeId'] ?? '').toString(),
+          'rfid': (scan['rfid'] ?? scan['epc'] ?? '').toString(),
+          'epc': (scan['epc'] ?? '').toString(),
+          'tid': (scan['tid'] ?? '').toString(),
+          'healthstatus': (scan['healthstatus'] ?? '').toString(),
+          'latitude': scan['latitude'],
+          'longitude': scan['longitude'],
+          'date': FieldValue.serverTimestamp(),
+          'savedAtLocal': (scan['savedAt'] ?? '').toString(),
+          'savedAt': FieldValue.serverTimestamp(),
+          'source': (scan['source'] ?? 'rfid_scan').toString(),
+          'userId': user.uid,
+          'userEmail': user.email ?? '',
+        }, SetOptions(merge: true));
+
+        await _cache.removePendingScanHistory(user.uid, scanId);
+      }
     } finally {
       _isSyncing = false;
     }

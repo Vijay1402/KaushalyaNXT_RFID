@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/connectivity_provider.dart';
 import '../../../core/services/local_cache_service.dart';
+import '../../../app/router/route_paths.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../tree_details/tree_controller.dart';
 
@@ -107,16 +108,33 @@ class FarmerDashboard extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    IconButton(
-                      onPressed: () {
-                        showModalBottomSheet<void>(
-                          context: context,
-                          isScrollControlled: true,
-                          builder: (_) => const NotificationSheet(),
-                        );
-                      },
-                      icon: const Icon(Icons.notifications),
-                      tooltip: 'Notifications',
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => context.push(RoutePaths.activityLog),
+                          icon: const Icon(Icons.history_rounded, size: 18),
+                          label: const Text('Activity Log'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.green.shade700,
+                            side: BorderSide(color: Colors.green.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          onPressed: () {
+                            showModalBottomSheet<void>(
+                              context: context,
+                              isScrollControlled: true,
+                              builder: (_) => const NotificationSheet(),
+                            );
+                          },
+                          icon: const Icon(Icons.notifications),
+                          tooltip: 'Notifications',
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -212,40 +230,6 @@ class FarmerDashboard extends ConsumerWidget {
                       icon: Icons.warning_amber_rounded,
                       warning: true,
                       onTap: () => context.push('/my-trees?filter=attention'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "TODAY'S TASKS",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                ListView(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _TaskCard(
-                      title: 'Scan a nearby tree tag',
-                      subtitle: 'Write or read RFID data for field work',
-                      button: 'SCAN NOW',
-                      onPressed: () => context.push('/scan'),
-                    ),
-                    _TaskCard(
-                      title: 'Review your tree records',
-                      subtitle: 'Open My Trees and check sync status',
-                      button: 'OPEN TREES',
-                      warning: (pendingSyncAsync.valueOrNull ?? 0) > 0,
-                      onPressed: () => context.push('/my-trees'),
-                    ),
-                    _TaskCard(
-                      title: 'Update farmer profile',
-                      subtitle: 'Edit contact details and reset password',
-                      button: 'OPEN PROFILE',
-                      onPressed: () => context.push('/profile'),
                     ),
                   ],
                 ),
@@ -532,51 +516,6 @@ class _NotificationTile extends StatelessWidget {
           Text(
             item.time,
             style: const TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TaskCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String button;
-  final bool warning;
-  final VoidCallback? onPressed;
-
-  const _TaskCard({
-    required this.title,
-    required this.subtitle,
-    required this.button,
-    this.warning = false,
-    this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: warning ? const Color(0xFFFFF3E0) : const Color(0xFFE8F5E9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: warning ? Colors.orange : Colors.green),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 5),
-          Text('Task: $subtitle'),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton(
-              onPressed: onPressed,
-              child: Text(button),
-            ),
           ),
         ],
       ),
