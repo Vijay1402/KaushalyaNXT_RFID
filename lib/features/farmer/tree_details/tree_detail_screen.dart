@@ -125,7 +125,7 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
   }
 
   String _tagHealthLabel(dynamic rawStatus) {
-    final index = (rawStatus as num?)?.toInt() ?? 0;
+    final index = _asInt(rawStatus);
     switch (index) {
       case 1:
         return 'Healthy';
@@ -141,7 +141,7 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
   }
 
   String _tagLastScanLabel(dynamic unixSeconds) {
-    final seconds = (unixSeconds as num?)?.toInt() ?? 0;
+    final seconds = _asInt(unixSeconds);
     if (seconds <= 0) return '-';
     return DateFormat('MMM d, yyyy').format(
       DateTime.fromMillisecondsSinceEpoch(seconds * 1000),
@@ -495,8 +495,8 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
       healthHistory: const [],
       maintenanceRecords: const [],
       photoUrls: const [],
-      latitude: (data['latitude'] as num?)?.toDouble() ?? 0,
-      longitude: (data['longitude'] as num?)?.toDouble() ?? 0,
+      latitude: _asDouble(data['latitude']),
+      longitude: _asDouble(data['longitude']),
       notes: (data['notes'] ?? '').toString(),
     );
   }
@@ -617,8 +617,8 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
     if (!isOnline) return;
 
     final location = (data['location'] ?? '').toString().trim();
-    final latitude = (data['latitude'] as num?)?.toDouble() ?? 0;
-    final longitude = (data['longitude'] as num?)?.toDouble() ?? 0;
+    final latitude = _asDouble(data['latitude']);
+    final longitude = _asDouble(data['longitude']);
     final alreadyHasLocation =
         location.isNotEmpty || (latitude != 0 && longitude != 0);
 
@@ -679,8 +679,8 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
                     : (currentUser?.name.trim().isNotEmpty ?? false)
                         ? currentUser!.name.trim()
                         : 'Unknown farmer';
-        final latitude = (data['latitude'] as num?)?.toDouble();
-        final longitude = (data['longitude'] as num?)?.toDouble();
+        final latitude = _asNullableDouble(data['latitude']);
+        final longitude = _asNullableDouble(data['longitude']);
         final latitudeText = latitude == null || latitude == 0
             ? '-'
             : latitude.toStringAsFixed(6);
@@ -1269,10 +1269,26 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
   DateTime _parseDate(dynamic date) {
     if (date is Timestamp) return date.toDate();
     if (date is Map && date['_seconds'] != null) {
-      final seconds = (date['_seconds'] as num).toInt();
+      final seconds = _asInt(date['_seconds']);
       return DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
     }
     return DateTime.tryParse(date.toString()) ?? DateTime.now();
+  }
+
+  int _asInt(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  double _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  double? _asNullableDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
   }
 }
 
