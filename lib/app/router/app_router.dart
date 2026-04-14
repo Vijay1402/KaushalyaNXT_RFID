@@ -9,6 +9,7 @@ import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/local_storage_viewer_screen.dart';
 import '../../features/farmer/dashboard/farmer_dashboard.dart';
 import '../../features/farmer/dashboard/activity_log_screen.dart';
+import '../../features/farm_manager/presentation/farm_manager_dashboard.dart';
 import '../../features/farmer/my_trees/my_trees_screen.dart';
 import '../../features/farmer/profile/profile_screen.dart';
 import '../../features/rfid/rfid_scan_screen.dart';
@@ -28,6 +29,7 @@ GoRouter createRouter(Ref ref) {
       final loggedIn = authState.user != null;
       final initialized = authState.isInitialized;
       final location = state.matchedLocation;
+      final homeRoute = RoutePaths.homeForRole(authState.user?.role);
 
       final isSplash = location == RoutePaths.splash;
       final isLogin = location == RoutePaths.login;
@@ -39,7 +41,7 @@ GoRouter createRouter(Ref ref) {
       }
 
       if (isSplash) {
-        return loggedIn ? RoutePaths.farmerHome : RoutePaths.login;
+        return loggedIn ? homeRoute : RoutePaths.login;
       }
 
       /// ❌ NOT LOGGED IN → allow only auth screens
@@ -49,7 +51,19 @@ GoRouter createRouter(Ref ref) {
 
       /// ❌ LOGGED IN → prevent going back to auth screens
       if (loggedIn && (isLogin || isRegister || isForgotPassword)) {
-        return RoutePaths.farmerHome;
+        return homeRoute;
+      }
+
+      if (loggedIn &&
+          location == RoutePaths.farmerHome &&
+          homeRoute != RoutePaths.farmerHome) {
+        return homeRoute;
+      }
+
+      if (loggedIn &&
+          location == RoutePaths.farmManagerHome &&
+          homeRoute != RoutePaths.farmManagerHome) {
+        return homeRoute;
       }
 
       return null;
@@ -82,6 +96,11 @@ GoRouter createRouter(Ref ref) {
       GoRoute(
         path: RoutePaths.farmerHome,
         builder: (context, state) => const FarmerDashboard(),
+      ),
+
+      GoRoute(
+        path: RoutePaths.farmManagerHome,
+        builder: (context, state) => const FarmManagerDashboard(),
       ),
 
       GoRoute(

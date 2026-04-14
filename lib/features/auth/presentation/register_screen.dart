@@ -132,6 +132,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         items: const [
                           DropdownMenuItem(
                               value: "farmer", child: Text("Farmer")),
+                          DropdownMenuItem(
+                            value: "farm_manager",
+                            child: Text("Farm Manager"),
+                          ),
                           DropdownMenuItem(value: "kvk", child: Text("KVK")),
                         ],
                         onChanged: (value) {
@@ -228,7 +232,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   content: Text("Registered Successfully")),
                             );
 
-                            router.go(RoutePaths.farmerHome);
+                            router.go(RoutePaths.homeForRole(role));
                           } catch (e) {
                             messenger.showSnackBar(
                               SnackBar(content: Text(e.toString())),

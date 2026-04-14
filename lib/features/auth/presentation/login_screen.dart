@@ -148,7 +148,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             final user = ref.read(authStateProvider).user;
 
                             if (user != null) {
-                              router.go(RoutePaths.farmerHome);
+                              router.go(RoutePaths.homeForRole(user.role));
                             }
                           } on FirebaseAuthException catch (e) {
                             /// 🔴 CLEAN ERROR MESSAGES
