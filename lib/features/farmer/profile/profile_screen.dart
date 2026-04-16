@@ -18,6 +18,15 @@ class ProfileScreen extends ConsumerWidget {
         (user?.role.trim().isNotEmpty ?? false) ? user!.role.trim() : "farmer";
     final userPhone =
         (user?.phone.trim().isNotEmpty ?? false) ? user!.phone.trim() : "-";
+    final managerCode = (user?.managerCode.trim().isNotEmpty ?? false)
+        ? user!.managerCode.trim()
+        : '';
+    final farmManagerName = (user?.farmManagerName.trim().isNotEmpty ?? false)
+        ? user!.farmManagerName.trim()
+        : '';
+    final farmManagerCode = (user?.farmManagerCode.trim().isNotEmpty ?? false)
+        ? user!.farmManagerCode.trim()
+        : '';
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -107,9 +116,16 @@ class ProfileScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _buildProfileHeader(userName, userRole),
+            _buildProfileHeader(userName, userRole, managerCode),
             const SizedBox(height: 20),
-            _buildInfoCard(userEmail, userPhone),
+            _buildInfoCard(
+              userRole,
+              userEmail,
+              userPhone,
+              managerCode,
+              farmManagerName,
+              farmManagerCode,
+            ),
             const SizedBox(height: 20),
             _buildFarmDetails(),
             const SizedBox(height: 20),
@@ -121,7 +137,11 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProfileHeader(String userName, String userRole) {
+  Widget _buildProfileHeader(
+    String userName,
+    String userRole,
+    String managerCode,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -132,36 +152,70 @@ class ProfileScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
+          const CircleAvatar(
             radius: 35,
             backgroundColor: Colors.white,
             child: Icon(Icons.person, size: 40, color: Colors.green),
           ),
-          SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                userName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    Text(
+                      userName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (managerCode.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          managerCode,
+                          style: TextStyle(
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                userRole[0].toUpperCase() + userRole.substring(1),
-                style: const TextStyle(color: Colors.white70),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  _formatRoleLabel(userRole),
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard(String userEmail, String userPhone) {
+  Widget _buildInfoCard(
+    String userRole,
+    String userEmail,
+    String userPhone,
+    String managerCode,
+    String farmManagerName,
+    String farmManagerCode,
+  ) {
     return _card(
       title: "Personal Information",
       children: [
@@ -171,6 +225,23 @@ class ProfileScreen extends ConsumerWidget {
             label: "Location",
             value: "Karnataka, India"),
         _InfoRow(icon: Icons.email, label: "Email", value: userEmail),
+        if (userRole.trim().toLowerCase() == 'farm_manager' &&
+            managerCode.isNotEmpty)
+          _InfoRow(
+            icon: Icons.badge_outlined,
+            label: "Manager Code",
+            value: managerCode,
+          ),
+        if (userRole.trim().toLowerCase() == 'farmer')
+          _InfoRow(
+            icon: Icons.supervisor_account_outlined,
+            label: "Farm Manager",
+            value: farmManagerName.isEmpty
+                ? "Not linked"
+                : (farmManagerCode.isEmpty
+                    ? farmManagerName
+                    : "$farmManagerName ($farmManagerCode)"),
+          ),
       ],
     );
   }
@@ -287,7 +358,7 @@ class ProfileScreen extends ConsumerWidget {
                   children: [
                     _buildEditField(
                       controller: nameController,
-                      label: "Farmer Name",
+                      label: "Name",
                       icon: Icons.person_outline,
                       errorText: nameError,
                     ),
@@ -492,6 +563,19 @@ class ProfileScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  String _formatRoleLabel(String userRole) {
+    final normalized = userRole.trim();
+    if (normalized.isEmpty) return 'Farmer';
+
+    return normalized
+        .split(RegExp(r'[_\s]+'))
+        .where((part) => part.isNotEmpty)
+        .map(
+          (part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+        )
+        .join(' ');
   }
 }
 

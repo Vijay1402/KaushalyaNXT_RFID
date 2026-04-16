@@ -3,13 +3,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/presentation/splash_screen.dart';
-import '../../features/auth/presentation/login_screen.dart';
-import '../../features/auth/presentation/register_screen.dart';
+import '../../features/auth/presentation/login_screen_v2.dart';
+import '../../features/auth/presentation/register_screen_v2.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/local_storage_viewer_screen.dart';
 import '../../features/farmer/dashboard/farmer_dashboard.dart';
 import '../../features/farmer/dashboard/activity_log_screen.dart';
 import '../../features/farm_manager/presentation/farm_manager_dashboard.dart';
+import '../../features/admin/presentation/admin_dashboard.dart';
 import '../../features/farmer/my_trees/my_trees_screen.dart';
 import '../../features/farmer/profile/profile_screen.dart';
 import '../../features/rfid/rfid_scan_screen.dart';
@@ -21,7 +22,14 @@ import 'package:kaushalyanxt_rfid/features/auth/presentation/support_screen.dart
 import 'route_paths.dart';
 
 GoRouter createRouter(Ref ref) {
-  final authState = ref.watch(authStateProvider);
+  final authState = ref.watch(
+    authStateProvider.select(
+      (state) => (
+        user: state.user,
+        isInitialized: state.isInitialized,
+      ),
+    ),
+  );
 
   return GoRouter(
     initialLocation: RoutePaths.splash,
@@ -66,6 +74,12 @@ GoRouter createRouter(Ref ref) {
         return homeRoute;
       }
 
+      if (loggedIn &&
+          location == RoutePaths.adminHome &&
+          homeRoute != RoutePaths.adminHome) {
+        return homeRoute;
+      }
+
       return null;
     },
     routes: [
@@ -101,6 +115,11 @@ GoRouter createRouter(Ref ref) {
       GoRoute(
         path: RoutePaths.farmManagerHome,
         builder: (context, state) => const FarmManagerDashboard(),
+      ),
+
+      GoRoute(
+        path: RoutePaths.adminHome,
+        builder: (context, state) => const AdminDashboard(),
       ),
 
       GoRoute(

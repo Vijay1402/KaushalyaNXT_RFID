@@ -55,6 +55,10 @@ class AuthController extends StateNotifier<AuthState> {
             email: (firebaseUser.email ?? '').trim(),
             role: 'farmer',
             phone: '',
+            managerCode: '',
+            farmManagerId: '',
+            farmManagerName: '',
+            farmManagerCode: '',
           );
 
     if (cachedUser != null) {
@@ -77,6 +81,10 @@ class AuthController extends StateNotifier<AuthState> {
             email: data['email'],
             role: data['role'],
             phone: (data['phone'] ?? '').toString(),
+            managerCode: (data['managerCode'] ?? '').toString(),
+            farmManagerId: (data['farmManagerId'] ?? '').toString(),
+            farmManagerName: (data['farmManagerName'] ?? '').toString(),
+            farmManagerCode: (data['farmManagerCode'] ?? '').toString(),
           );
           await cache.saveUser(user);
           state = AuthState(user: user, isInitialized: true);
@@ -125,6 +133,55 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  Future<PhoneVerificationResult> sendPhoneOtp(String phone) async {
+    state = state.copyWith(isLoading: true);
+
+    try {
+      final result = await ref.read(authServiceProvider).sendPhoneOtp(phone);
+      state = state.copyWith(isLoading: false);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
+  }
+
+  Future<void> loginWithPhoneOtp({
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    state = state.copyWith(isLoading: true);
+
+    try {
+      final user = await ref.read(authServiceProvider).loginWithPhoneOtp(
+            verificationId: verificationId,
+            smsCode: smsCode,
+          );
+      await ref.read(localCacheServiceProvider).saveUser(user);
+      state = AuthState(user: user, isLoading: false, isInitialized: true);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
+  }
+
+  Future<void> loginWithPhoneCredential({
+    required PhoneAuthCredential credential,
+  }) async {
+    state = state.copyWith(isLoading: true);
+
+    try {
+      final user = await ref.read(authServiceProvider).loginWithPhoneCredential(
+            credential,
+          );
+      await ref.read(localCacheServiceProvider).saveUser(user);
+      state = AuthState(user: user, isLoading: false, isInitialized: true);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
+  }
+
   /// REGISTER
   Future<void> register({
     required String name,
@@ -132,6 +189,7 @@ class AuthController extends StateNotifier<AuthState> {
     required String password,
     required String role,
     required String phone,
+    String farmManagerCode = '',
   }) async {
     state = state.copyWith(isLoading: true);
 
@@ -142,9 +200,67 @@ class AuthController extends StateNotifier<AuthState> {
             password: password,
             role: role,
             phone: phone,
+            farmManagerCode: farmManagerCode,
           );
       await ref.read(localCacheServiceProvider).saveUser(user);
 
+      state = AuthState(user: user, isLoading: false, isInitialized: true);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
+  }
+
+  Future<void> registerWithPhoneOtp({
+    required String name,
+    required String email,
+    required String password,
+    required String role,
+    required String phone,
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    state = state.copyWith(isLoading: true);
+
+    try {
+      final user = await ref.read(authServiceProvider).registerWithPhoneOtp(
+            name: name,
+            email: email,
+            password: password,
+            role: role,
+            phone: phone,
+            verificationId: verificationId,
+            smsCode: smsCode,
+          );
+      await ref.read(localCacheServiceProvider).saveUser(user);
+      state = AuthState(user: user, isLoading: false, isInitialized: true);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
+  }
+
+  Future<void> registerWithPhoneCredential({
+    required String name,
+    required String email,
+    required String password,
+    required String role,
+    required String phone,
+    required PhoneAuthCredential credential,
+  }) async {
+    state = state.copyWith(isLoading: true);
+
+    try {
+      final user =
+          await ref.read(authServiceProvider).registerWithPhoneCredential(
+                name: name,
+                email: email,
+                password: password,
+                role: role,
+                phone: phone,
+                credential: credential,
+              );
+      await ref.read(localCacheServiceProvider).saveUser(user);
       state = AuthState(user: user, isLoading: false, isInitialized: true);
     } catch (e) {
       state = state.copyWith(isLoading: false);

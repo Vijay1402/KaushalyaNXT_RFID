@@ -4,11 +4,15 @@ class RoutePaths {
   static const register = '/register';
   static const farmerHome = '/farmer/home';
   static const farmManagerHome = '/farm-manager/home';
+  static const adminHome = '/admin/home';
   static const forgotPassword = '/forgot-password';
   static const activityLog = '/activity-log';
 
   static String homeForRole(String? role) {
     final normalized = (role ?? '').trim().toLowerCase();
+    if (normalized == 'admin') {
+      return adminHome;
+    }
     if (normalized == 'farm_manager' || normalized == 'farm manager') {
       return farmManagerHome;
     }

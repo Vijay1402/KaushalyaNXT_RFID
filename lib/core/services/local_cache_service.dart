@@ -24,6 +24,10 @@ class LocalCacheService {
         'email': user.email,
         'role': user.role,
         'phone': user.phone,
+        'managerCode': user.managerCode,
+        'farmManagerId': user.farmManagerId,
+        'farmManagerName': user.farmManagerName,
+        'farmManagerCode': user.farmManagerCode,
       }),
     );
   }
@@ -40,6 +44,10 @@ class LocalCacheService {
         email: (data['email'] ?? '').toString(),
         role: (data['role'] ?? 'farmer').toString(),
         phone: (data['phone'] ?? '').toString(),
+        managerCode: (data['managerCode'] ?? '').toString(),
+        farmManagerId: (data['farmManagerId'] ?? '').toString(),
+        farmManagerName: (data['farmManagerName'] ?? '').toString(),
+        farmManagerCode: (data['farmManagerCode'] ?? '').toString(),
       );
     } catch (_) {
       return null;
