@@ -4,6 +4,9 @@ class RoutePaths {
   static const register = '/register';
   static const farmerHome = '/farmer/home';
   static const farmManagerHome = '/farm-manager/home';
+  static const farmManagerFarms = '/farm-manager/farms';
+  static const farmManagerFarmDetails = '/farm-manager/farm-details';
+  static const farmManagerIssues = '/farm-manager/issues';
   static const adminHome = '/admin/home';
   static const forgotPassword = '/forgot-password';
   static const activityLog = '/activity-log';

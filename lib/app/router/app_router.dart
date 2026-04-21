@@ -10,6 +10,10 @@ import '../../features/auth/presentation/local_storage_viewer_screen.dart';
 import '../../features/farmer/dashboard/farmer_dashboard.dart';
 import '../../features/farmer/dashboard/activity_log_screen.dart';
 import '../../features/farm_manager/presentation/farm_manager_dashboard.dart';
+import '../../features/farm_manager/presentation/farm_manager_data.dart';
+import '../../features/farm_manager/presentation/screens/farm_detail_screen.dart';
+import '../../features/farm_manager/presentation/screens/farm_list_screen.dart';
+import '../../features/farm_manager/presentation/screens/issue_tracker_screen.dart';
 import '../../features/admin/presentation/admin_dashboard.dart';
 import '../../features/farmer/my_trees/my_trees_screen.dart';
 import '../../features/farmer/profile/profile_screen.dart';
@@ -115,6 +119,25 @@ GoRouter createRouter(Ref ref) {
       GoRoute(
         path: RoutePaths.farmManagerHome,
         builder: (context, state) => const FarmManagerDashboard(),
+      ),
+
+      GoRoute(
+        path: RoutePaths.farmManagerFarms,
+        builder: (context, state) => const FarmListScreen(),
+      ),
+
+      GoRoute(
+        path: RoutePaths.farmManagerFarmDetails,
+        builder: (context, state) => FarmDetailScreen(
+          farm: state.extra as FarmManagerFarm?,
+        ),
+      ),
+
+      GoRoute(
+        path: RoutePaths.farmManagerIssues,
+        builder: (context, state) => IssueTrackerScreen(
+          initialFarmFilter: state.uri.queryParameters['farm'] ?? '',
+        ),
       ),
 
       GoRoute(
