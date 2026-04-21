@@ -1,0 +1,67 @@
+name: kaushalyanxt_rfid
+description: A new Flutter project.
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # 🔥 Firebase
+  firebase_core: ^3.15.2
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.4
+  firebase_storage: ^12.4.10
+  
+  # ✅ ADD THESE
+  url_launcher: ^6.2.5
+  csv: ^5.1.1
+  pdf: ^3.10.7
+  
+
+  # 🔴 Google Sign-In
+  google_sign_in: ^6.2.1
+
+  # 🧠 State Management
+  flutter_riverpod: ^2.5.1
+
+  # 🌐 Navigation
+  go_router: ^14.2.0
+
+  # 📡 INTERNET STATUS (UPDATED)
+  connectivity_plus: ^6.0.3
+
+  # 📸 MEDIA
+  image_picker: ^1.0.7
+
+  # 📅 DATE FORMAT
+  intl: ^0.18.1
+
+  # 📍 LOCATION
+  permission_handler: ^12.0.1
+  geolocator: ^13.0.2
+  geocoding: ^3.0.0
+
+  # 🗺 MAP
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+
+  # 💾 STORAGE
+  shared_preferences: ^2.3.2
+  path_provider: ^2.1.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
