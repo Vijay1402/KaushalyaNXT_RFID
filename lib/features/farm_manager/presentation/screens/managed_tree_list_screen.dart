@@ -1,22 +1,25 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../farmer/tree_details/tree_controller.dart';
+import '../compare/models/compare_model.dart' as compare;
+import '../compare/presentation/select_trees_screen.dart';
 import '../farm_manager_data.dart';
 
-class ManagedTreeListScreen extends ConsumerStatefulWidget {
+class ManagedTreeListScreen extends StatefulWidget {
   const ManagedTreeListScreen({super.key});
 
   @override
-  ConsumerState<ManagedTreeListScreen> createState() =>
-      _ManagedTreeListScreenState();
+  State<ManagedTreeListScreen> createState() => _ManagedTreeListScreenState();
 }
 
-class _ManagedTreeListScreenState extends ConsumerState<ManagedTreeListScreen> {
+class _ManagedTreeListScreenState extends State<ManagedTreeListScreen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
+  final Set<String> _selectedTrees = <String>{};
+  List<Map<String, dynamic>> _currentScopedTrees =
+      const <Map<String, dynamic>>[];
   String _search = '';
-  String _selectedHealth = 'All';
 
   @override
   void dispose() {
@@ -24,14 +27,16 @@ class _ManagedTreeListScreenState extends ConsumerState<ManagedTreeListScreen> {
     super.dispose();
   }
 
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   void _openTreeDetails(Map<String, dynamic> tree) {
     final treeDocId = (tree['_docId'] ?? '').toString().trim();
     if (treeDocId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This tree record is missing a document id.'),
-        ),
-      );
+      _showMessage('This tree record is missing a document id.');
       return;
     }
 
@@ -42,595 +47,447 @@ class _ManagedTreeListScreenState extends ConsumerState<ManagedTreeListScreen> {
     );
   }
 
-  int _treePriority(Map<String, dynamic> tree) {
-    switch (healthLabel(tree['healthStatus'])) {
-      case 'Critical':
-        return 0;
-      case 'At Risk':
-        return 1;
-      case 'Needs Attention':
-        return 2;
-      case 'Healthy':
-        return 3;
-      default:
-        return 4;
+  String _treeKey(Map<String, dynamic> tree) {
+    final docId = (tree['_docId'] ?? '').toString().trim();
+    if (docId.isNotEmpty) {
+      return docId;
     }
+    return _treeLabel(tree);
   }
 
-  List<Map<String, dynamic>> _sortedTrees(List<Map<String, dynamic>> trees) {
-    final sortedTrees = List<Map<String, dynamic>>.from(trees);
-    sortedTrees.sort((left, right) {
-      final priorityCompare =
-          _treePriority(left).compareTo(_treePriority(right));
-      if (priorityCompare != 0) {
-        return priorityCompare;
-      }
-
-      final leftTreeId =
-          firstNonEmptyString([left['treeId']], fallback: 'tree').toLowerCase();
-      final rightTreeId = firstNonEmptyString(
-        [right['treeId']],
-        fallback: 'tree',
-      ).toLowerCase();
-      return leftTreeId.compareTo(rightTreeId);
-    });
-    return sortedTrees;
-  }
-
-  String _formatDateLabel(Map<String, dynamic> tree) {
-    final parsed = parseDateTime(
-      tree['lastinspectiondate'] ??
-          tree['lastInspectionDate'] ??
-          tree['updatedAt'] ??
-          tree['createdAt'],
+  String _treeLabel(Map<String, dynamic> tree) {
+    return firstNonEmptyString(
+      [
+        tree['treeId'],
+        tree['_docId'],
+      ],
+      fallback: 'Unknown',
     );
-    if (parsed == null) {
-      return 'Inspection not available';
-    }
-    final localDate = parsed.toLocal();
-    final day = localDate.day.toString().padLeft(2, '0');
-    final month = _monthLabel(localDate.month);
-    final year = localDate.year.toString();
-    return 'Last inspection: $day $month $year';
   }
 
-  String _monthLabel(int month) {
-    const months = <String>[
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    if (month < 1 || month > months.length) {
-      return 'Jan';
+  void _toggleSelected(Map<String, dynamic> tree) {
+    final key = _treeKey(tree);
+    setState(() {
+      if (_selectedTrees.contains(key)) {
+        _selectedTrees.remove(key);
+      } else {
+        _selectedTrees.add(key);
+      }
+    });
+  }
+
+  compare.Tree _toCompareTree(Map<String, dynamic> tree) {
+    final yieldValue = firstNonEmptyString(
+      [
+        tree['lastYieldKg'],
+        tree['yieldKg'],
+        tree['yield'],
+      ],
+      fallback: 'Unknown',
+    );
+
+    return compare.Tree(
+      id: _treeKey(tree),
+      name: _treeLabel(tree),
+      yield: yieldValue == 'Unknown' ? yieldValue : '$yieldValue kg',
+      health: healthLabel(tree['healthStatus']),
+      sync: tree['isScanned'] == true ? 'Scanned' : 'Not Scanned',
+    );
+  }
+
+  void _openCompareFlow() {
+    if (_currentScopedTrees.length < 2) {
+      _showMessage('At least two trees are needed to compare.');
+      return;
     }
-    return months[month - 1];
+
+    final compareTrees =
+        _currentScopedTrees.map(_toCompareTree).toList(growable: false);
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SelectTreesScreen(
+          trees: compareTrees,
+          initiallySelectedTreeIds: _selectedTrees,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final analyticsAsync = ref.watch(farmManagerAnalyticsProvider);
+    return FutureBuilder<FarmManagerScope>(
+      future: loadFarmManagerScope(),
+      builder: (context, scopeSnapshot) {
+        if (scopeSnapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F2),
-      appBar: AppBar(
-        backgroundColor: Colors.green.shade700,
-        foregroundColor: Colors.white,
-        title: const Text('Managed Trees'),
-      ),
-      body: analyticsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Unable to load tree records: $error',
-              textAlign: TextAlign.center,
-            ),
+        final scope = scopeSnapshot.data ??
+            const FarmManagerScope(
+              managerUid: '',
+              managerEmail: '',
+              managerCode: '',
+              linkedFarmerIds: <String>{},
+              linkedFarmerEmails: <String>{},
+            );
+
+        return Scaffold(
+          backgroundColor: Colors.grey[200],
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF2E7D32),
+            foregroundColor: Colors.white,
+            title: const Text('All Trees View'),
           ),
-        ),
-        data: (data) {
-          final issueCountsByTreeDocId = <String, int>{};
-          for (final issue in data.issues) {
-            final treeDocId = issue.treeDocId.trim();
-            if (treeDocId.isEmpty) {
-              continue;
-            }
-            issueCountsByTreeDocId.update(
-              treeDocId,
-              (count) => count + 1,
-              ifAbsent: () => 1,
-            );
-          }
-
-          final sortedTrees = _sortedTrees(data.trees);
-          final filteredTrees = sortedTrees.where((tree) {
-            final health = healthLabel(tree['healthStatus']);
-            if (_selectedHealth != 'All' && health != _selectedHealth) {
-              return false;
-            }
-
-            final query = _search.trim().toLowerCase();
-            if (query.isEmpty) {
-              return true;
-            }
-
-            final values = <String>[
-              firstNonEmptyString([tree['treeId']]),
-              farmNameFromTree(tree),
-              farmerNameFromTree(tree),
-              firstNonEmptyString([tree['location']]),
-              firstNonEmptyString([tree['species']]),
-            ];
-
-            return values.any(
-              (value) => value.toLowerCase().contains(query),
-            );
-          }).toList(growable: false);
-
-          final healthyCount = data.trees
-              .where((tree) => healthLabel(tree['healthStatus']) == 'Healthy')
-              .length;
-          final atRiskCount = data.trees
-              .where(
-                (tree) => const {'At Risk', 'Critical'}
-                    .contains(healthLabel(tree['healthStatus'])),
-              )
-              .length;
-
-          return Column(
+          body: Column(
             children: [
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x12000000),
-                      blurRadius: 12,
-                      offset: Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'All Managed Trees',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF203423),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Browse every tree linked to the farmers in this farm manager scope.',
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _TreeStatCard(
-                            title: 'Total Trees',
-                            value: '${data.trees.length}',
-                            icon: Icons.park_outlined,
-                            color: Colors.green.shade700,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _TreeStatCard(
-                            title: 'Healthy',
-                            value: '$healthyCount',
-                            icon: Icons.favorite_outline,
-                            color: Colors.teal.shade700,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _TreeStatCard(
-                            title: 'Alerts',
-                            value: '$atRiskCount',
-                            icon: Icons.warning_amber_rounded,
-                            color: atRiskCount == 0
-                                ? Colors.green.shade700
-                                : Colors.orange.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(10),
                 child: TextField(
                   controller: _searchController,
                   onChanged: (value) {
                     setState(() {
-                      _search = value;
+                      _search = value.trim().toLowerCase();
                     });
                   },
                   decoration: InputDecoration(
-                    hintText:
-                        'Search tree ID, farm, farmer, species, or location',
+                    hintText: 'Search',
                     prefixIcon: const Icon(Icons.search),
+                    suffixIcon: const Icon(Icons.mic),
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(30),
                       borderSide: BorderSide.none,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(
                   children: [
-                    _HealthFilterChip(
-                      label: 'All',
-                      active: _selectedHealth == 'All',
-                      onTap: () {
-                        setState(() {
-                          _selectedHealth = 'All';
-                        });
-                      },
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          _showMessage('Advanced filters can be added next.');
+                        },
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
+                        child: const Text('Advanced Filters'),
+                      ),
                     ),
                     const SizedBox(width: 10),
-                    _HealthFilterChip(
-                      label: 'Healthy',
-                      active: _selectedHealth == 'Healthy',
-                      onTap: () {
-                        setState(() {
-                          _selectedHealth = 'Healthy';
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _HealthFilterChip(
-                      label: 'Needs Attention',
-                      active: _selectedHealth == 'Needs Attention',
-                      onTap: () {
-                        setState(() {
-                          _selectedHealth = 'Needs Attention';
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _HealthFilterChip(
-                      label: 'At Risk',
-                      active: _selectedHealth == 'At Risk',
-                      onTap: () {
-                        setState(() {
-                          _selectedHealth = 'At Risk';
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _HealthFilterChip(
-                      label: 'Critical',
-                      active: _selectedHealth == 'Critical',
-                      onTap: () {
-                        setState(() {
-                          _selectedHealth = 'Critical';
-                        });
-                      },
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _openCompareFlow,
+                        icon: const Icon(Icons.compare_arrows),
+                        label: Text(
+                          'Compare${_selectedTrees.isNotEmpty ? ' (${_selectedTrees.length})' : ''}',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _selectedTrees.isEmpty
+                            ? 'Tap Compare to choose trees, or long-press a tree to preselect it here.'
+                            : 'Long-press or tap selected cards to adjust your compare list.',
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    if (_selectedTrees.isNotEmpty)
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedTrees.clear();
+                          });
+                        },
+                        child: const Text('Clear'),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
               Expanded(
-                child: filteredTrees.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            data.trees.isEmpty
-                                ? 'No tree records are available for this farm manager yet.'
-                                : 'No trees match the current search or health filter.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey.shade700),
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _firestore.collection('trees').snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      _currentScopedTrees = const <Map<String, dynamic>>[];
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      _currentScopedTrees = const <Map<String, dynamic>>[];
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    }
+
+                    final treeDocs = snapshot.data?.docs ??
+                        <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    final scopedTrees = buildScopedTrees(treeDocs, scope);
+                    _currentScopedTrees = scopedTrees;
+                    final visibleTrees = scopedTrees.where((tree) {
+                      if (_search.isEmpty) {
+                        return true;
+                      }
+
+                      final values = <String>[
+                        _treeLabel(tree),
+                        firstNonEmptyString([tree['location']]),
+                        firstNonEmptyString([tree['species']]),
+                        farmNameFromTree(tree),
+                        farmerNameFromTree(tree),
+                      ];
+
+                      return values.any(
+                        (value) => value.toLowerCase().contains(_search),
+                      );
+                    }).toList(growable: false);
+
+                    if (visibleTrees.isEmpty) {
+                      final message = scopedTrees.isEmpty
+                          ? 'No trees found'
+                          : 'No trees match the current search';
+                      return Center(child: Text(message));
+                    }
+
+                    return ListView.builder(
+                      itemCount: visibleTrees.length,
+                      itemBuilder: (context, index) {
+                        final tree = visibleTrees[index];
+                        final key = _treeKey(tree);
+                        final health = healthLabel(tree['healthStatus']);
+                        final isHealthy = health == 'Healthy';
+
+                        return GestureDetector(
+                          onTap: () {
+                            if (_selectedTrees.isNotEmpty) {
+                              _toggleSelected(tree);
+                              return;
+                            }
+                            _openTreeDetails(tree);
+                          },
+                          onLongPress: () => _toggleSelected(tree),
+                          child: TreeCard(
+                            id: _treeLabel(tree),
+                            age: firstNonEmptyString(
+                              [
+                                tree['treeAge'],
+                                tree['age'],
+                              ],
+                              fallback: 'Unknown',
+                            ),
+                            address: firstNonEmptyString(
+                              [
+                                tree['location'],
+                                tree['plotNumber'],
+                                tree['plot'],
+                              ],
+                              fallback: 'Farm Address',
+                            ),
+                            yieldValue: firstNonEmptyString(
+                              [
+                                tree['lastYieldKg'],
+                                tree['yieldKg'],
+                                tree['yield'],
+                              ],
+                              fallback: 'Unknown',
+                            ),
+                            status: tree['isScanned'] == true
+                                ? 'Scanned'
+                                : 'Not Scanned',
+                            health: health,
+                            isHealthy: isHealthy,
+                            isSelected: _selectedTrees.contains(key),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _showMessage('Block action can be connected next.');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                        itemCount: filteredTrees.length,
-                        itemBuilder: (context, index) {
-                          final tree = filteredTrees[index];
-                          final treeId = firstNonEmptyString(
-                            [tree['treeId']],
-                            fallback: 'Tree',
-                          );
-                          final farmLabel = farmNameFromTree(tree);
-                          final farmerLabel = farmerNameFromTree(tree);
-                          final location = firstNonEmptyString(
-                            [tree['location']],
-                            fallback: 'Location unavailable',
-                          );
-                          final species = firstNonEmptyString(
-                            [tree['species']],
-                            fallback: 'Species not set',
-                          );
-                          final health = healthLabel(tree['healthStatus']);
-                          final treeDocId =
-                              (tree['_docId'] ?? '').toString().trim();
-                          final issueCount = treeDocId.isEmpty
-                              ? 0
-                              : (issueCountsByTreeDocId[treeDocId] ?? 0);
-                          final isScanned = tree['isScanned'] == true;
-
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: InkWell(
-                              onTap: () => _openTreeDetails(tree),
-                              borderRadius: BorderRadius.circular(22),
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(22),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.05),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 5),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          width: 48,
-                                          height: 48,
-                                          decoration: BoxDecoration(
-                                            color: healthColor(health)
-                                                .withValues(alpha: 0.12),
-                                            borderRadius:
-                                                BorderRadius.circular(14),
-                                          ),
-                                          child: Icon(
-                                            Icons.park_outlined,
-                                            color: healthColor(health),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                treeId,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 16,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '$farmLabel  •  $farmerLabel',
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade700,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const Icon(
-                                          Icons.chevron_right_rounded,
-                                          color: Color(0xFF72816F),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      children: [
-                                        _TreeInfoPill(
-                                          icon: Icons.favorite_outline,
-                                          label: health,
-                                          color: healthColor(health),
-                                        ),
-                                        _TreeInfoPill(
-                                          icon: Icons.spa_outlined,
-                                          label: species,
-                                          color: Colors.green.shade700,
-                                        ),
-                                        _TreeInfoPill(
-                                          icon: Icons.qr_code_2_outlined,
-                                          label: isScanned
-                                              ? 'Scanned'
-                                              : 'Not scanned',
-                                          color: isScanned
-                                              ? Colors.teal.shade700
-                                              : Colors.orange.shade700,
-                                        ),
-                                        _TreeInfoPill(
-                                          icon: Icons.warning_amber_rounded,
-                                          label: issueCount == 0
-                                              ? 'No issues'
-                                              : '$issueCount issues',
-                                          color: issueCount == 0
-                                              ? Colors.green.shade700
-                                              : Colors.red.shade700,
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      location,
-                                      style: TextStyle(
-                                        color: Colors.grey.shade800,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _formatDateLabel(tree),
-                                      style: TextStyle(
-                                        color: Colors.grey.shade700,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+                        child: const Text('Block Action'),
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _showMessage('Export PDF can be connected next.');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
+                        child: const Text('Export PDF'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _showMessage('Export Excel can be connected next.');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
+                        child: const Text('Export Excel'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
 
-class _TreeStatCard extends StatelessWidget {
-  const _TreeStatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
+class TreeCard extends StatelessWidget {
+  const TreeCard({
+    super.key,
+    required this.id,
+    required this.age,
+    required this.address,
+    required this.yieldValue,
+    required this.status,
+    required this.health,
+    required this.isHealthy,
+    this.isSelected = false,
   });
 
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
+  final String id;
+  final String age;
+  final String address;
+  final String yieldValue;
+  final String status;
+  final String health;
+  final bool isHealthy;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      color: isSelected ? Colors.blue[50] : Colors.purple[50],
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Icon(Icons.park, size: 50, color: Colors.green),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tree #$id',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Tree Age: $age'),
+                  const SizedBox(height: 2),
+                  Text(address),
+                  const SizedBox(height: 2),
+                  Text('Yield: $yieldValue'),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF5F7062),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (isSelected)
+                  const Icon(Icons.check_circle, color: Colors.blue),
+                StatusBadge(
+                  text: status,
+                  color: isHealthy ? Colors.green : Colors.orange,
+                ),
+                const SizedBox(height: 8),
+                StatusBadge(
+                  text: health,
+                  color: isHealthy ? Colors.green : Colors.orange,
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HealthFilterChip extends StatelessWidget {
-  const _HealthFilterChip({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? Colors.green.shade700 : Colors.white,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: active ? Colors.green.shade700 : Colors.grey.shade300,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: active ? Colors.white : Colors.grey.shade800,
-            fontWeight: FontWeight.w600,
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _TreeInfoPill extends StatelessWidget {
-  const _TreeInfoPill({
-    required this.icon,
-    required this.label,
+class StatusBadge extends StatelessWidget {
+  const StatusBadge({
+    super.key,
+    required this.text,
     required this.color,
   });
 
-  final IconData icon;
-  final String label;
+  final String text;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color, width: 2),
+        borderRadius: BorderRadius.circular(20),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
-          ),
-        ],
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }
