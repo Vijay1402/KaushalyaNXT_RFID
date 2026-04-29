@@ -151,8 +151,9 @@ class _FarmListScreenState extends State<FarmListScreen> {
                                       Border.all(color: Colors.amber.shade200),
                                 ),
                                 child: Text(
-                                  'No linked farmers were found for this manager, '
-                                  'so the directory is showing all available farm data.',
+                                  scope.managerCode.isEmpty
+                                      ? 'No farmers are linked to this manager account yet.'
+                                      : 'No farmers are linked to manager code ${scope.managerCode} yet. Once a farmer uses this code, their farms and trees will appear here.',
                                   style: TextStyle(
                                     color: Colors.amber.shade900,
                                     fontSize: 12,
@@ -188,6 +189,11 @@ class _FarmListScreenState extends State<FarmListScreen> {
                                     icon: Icons.park_outlined,
                                     title: 'Total Trees',
                                     value: '${scopedTrees.length}',
+                                    onTap: () {
+                                      context.push(
+                                        RoutePaths.farmManagerTrees,
+                                      );
+                                    },
                                   ),
                                 ),
                                 const SizedBox(width: 10),
@@ -196,6 +202,11 @@ class _FarmListScreenState extends State<FarmListScreen> {
                                     icon: Icons.groups_2_outlined,
                                     title: 'Farmers',
                                     value: '${uniqueFarmerCount(scopedTrees)}',
+                                    onTap: () {
+                                      context.push(
+                                        RoutePaths.farmManagerFarmers,
+                                      );
+                                    },
                                   ),
                                 ),
                               ],
@@ -210,12 +221,19 @@ class _FarmListScreenState extends State<FarmListScreen> {
                           child: filteredFarms.isEmpty
                               ? ListView(
                                   padding: const EdgeInsets.all(24),
-                                  children: const [
-                                    SizedBox(height: 80),
+                                  children: [
+                                    const SizedBox(height: 80),
                                     _EmptyState(
-                                      title: 'No farms found',
-                                      message:
-                                          'Try a different search or add farm data to Firestore.',
+                                      title: scope.shouldFilter
+                                          ? 'No managed farms found'
+                                          : 'No farms found',
+                                      message: scope.shouldFilter
+                                          ? scope.hasLinkedFarmers
+                                              ? 'No farm records were matched for the farmers linked to this manager yet.'
+                                              : scope.managerCode.isEmpty
+                                                  ? 'No farmers are linked to this manager account yet.'
+                                                  : 'Ask the farmer to register or log in using manager code ${scope.managerCode} to see their farms here.'
+                                          : 'Try a different search or add farm data to Firestore.',
                                     ),
                                   ],
                                 )
@@ -359,15 +377,17 @@ class _SummaryCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.value,
+    this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -383,7 +403,17 @@ class _SummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.green.shade700),
+          Row(
+            children: [
+              Icon(icon, color: Colors.green.shade700),
+              const Spacer(),
+              if (onTap != null)
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.green.shade700,
+                ),
+            ],
+          ),
           const SizedBox(height: 10),
           Text(
             title,
@@ -403,6 +433,16 @@ class _SummaryCard extends StatelessWidget {
         ],
       ),
     );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: content,
+    );
   }
 }
 
@@ -410,6 +450,16 @@ class _FarmCard extends StatelessWidget {
   const _FarmCard({required this.farm});
 
   final FarmManagerFarm farm;
+
+  void _openFarmerManagement(BuildContext context) {
+    context.push(
+      '${RoutePaths.farmManagerFarmers}?farmerId='
+      '${Uri.encodeComponent(farm.farmerId)}&farmerName='
+      '${Uri.encodeComponent(farm.farmerName)}&farmId='
+      '${Uri.encodeComponent(farm.id)}&farmLabel='
+      '${Uri.encodeComponent(farm.name)}',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -522,6 +572,8 @@ class _FarmCard extends StatelessWidget {
                   child: _BottomMetric(
                     label: 'Farmer',
                     value: farm.farmerName,
+                    highlight: true,
+                    onTap: () => _openFarmerManagement(context),
                   ),
                 ),
                 Expanded(
@@ -589,14 +641,18 @@ class _BottomMetric extends StatelessWidget {
   const _BottomMetric({
     required this.label,
     required this.value,
+    this.onTap,
+    this.highlight = false,
   });
 
   final String label;
   final String value;
+  final VoidCallback? onTap;
+  final bool highlight;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -607,12 +663,42 @@ class _BottomMetric extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-          overflow: TextOverflow.ellipsis,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: highlight ? Colors.green.shade800 : null,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (onTap != null) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 16,
+                color: Colors.green.shade700,
+              ),
+            ],
+          ],
         ),
       ],
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: content,
+      ),
     );
   }
 }

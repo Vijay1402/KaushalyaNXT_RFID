@@ -7,10 +7,14 @@ import '../farm_manager_data.dart';
 class IssueTrackerScreen extends StatefulWidget {
   const IssueTrackerScreen({
     super.key,
-    this.initialFarmFilter = '',
+    this.initialFarmId = '',
+    this.initialFarmLabel = '',
+    this.initialSeverity = 'All',
   });
 
-  final String initialFarmFilter;
+  final String initialFarmId;
+  final String initialFarmLabel;
+  final String initialSeverity;
 
   @override
   State<IssueTrackerScreen> createState() => _IssueTrackerScreenState();
@@ -24,9 +28,28 @@ class _IssueTrackerScreenState extends State<IssueTrackerScreen> {
   String _scopedIssueKey = '';
 
   @override
+  void initState() {
+    super.initState();
+    _selectedSeverity = _normalizedSeverity(widget.initialSeverity);
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  String _normalizedSeverity(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'critical':
+        return 'Critical';
+      case 'monitoring':
+        return 'Monitoring';
+      case 'resolved':
+        return 'Resolved';
+      default:
+        return 'All';
+    }
   }
 
   void _ensureScopedIssueFuture(
@@ -113,11 +136,16 @@ class _IssueTrackerScreenState extends State<IssueTrackerScreen> {
     String? helperMessage,
   }) {
     final filteredIssues = issues.where((issue) {
-      if (widget.initialFarmFilter.isNotEmpty &&
-          issue.farmId != widget.initialFarmFilter &&
-          issue.farmLabel.toLowerCase() !=
-              widget.initialFarmFilter.toLowerCase()) {
-        return false;
+      if (widget.initialFarmId.isNotEmpty ||
+          widget.initialFarmLabel.isNotEmpty) {
+        final matchesFarmId = widget.initialFarmId.isNotEmpty &&
+            issue.farmId == widget.initialFarmId;
+        final matchesFarmLabel = widget.initialFarmLabel.isNotEmpty &&
+            issue.farmLabel.toLowerCase() ==
+                widget.initialFarmLabel.toLowerCase();
+        if (!matchesFarmId && !matchesFarmLabel) {
+          return false;
+        }
       }
 
       if (_selectedSeverity != 'All' && issue.severity != _selectedSeverity) {
@@ -390,6 +418,17 @@ class _IssueTrackerScreenState extends State<IssueTrackerScreen> {
                   <QueryDocumentSnapshot<Map<String, dynamic>>>[];
               final scopedTrees = buildScopedTrees(treeDocs, scope);
 
+              if (scope.shouldFilter && scopedTrees.isEmpty) {
+                return _buildIssueContent(
+                  const <FarmManagerIssue>[],
+                  helperMessage: scope.hasLinkedFarmers
+                      ? 'No issue-ready tree records were found for the farmers linked to this manager yet.'
+                      : scope.managerCode.isEmpty
+                          ? 'No farmers are linked to this manager account yet.'
+                          : 'No farmers are linked to manager code ${scope.managerCode} yet.',
+                );
+              }
+
               if (scopedTrees.isNotEmpty) {
                 _ensureScopedIssueFuture(scopedTrees, scope);
 
@@ -444,8 +483,8 @@ class _IssueTrackerScreenState extends State<IssueTrackerScreen> {
                         ? 'Issue details are restricted by Firestore rules for '
                             'this account. No accessible issue records were '
                             'found yet.'
-                        : 'Showing the global issue feed because no managed trees '
-                            'were matched for this farm manager yet.',
+                        : 'Showing the global issue feed because no manager scope '
+                            'was available for this session.',
                   );
                 },
               );

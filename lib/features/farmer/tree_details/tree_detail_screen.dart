@@ -1210,6 +1210,7 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
 
   Widget _miniMap(double lat, double lng) {
     final point = LatLng(lat, lng);
+    final isOnline = ref.watch(connectivityStatusProvider).value ?? true;
     return Container(
       height: 160,
       decoration: BoxDecoration(
@@ -1218,33 +1219,53 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: FlutterMap(
-          options: MapOptions(
-            initialCenter: point,
-            initialZoom: 15,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.all,
-            ),
-          ),
+        child: Stack(
           children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.kaushalyanxt_rfid',
-            ),
-            MarkerLayer(
-              markers: [
-                Marker(
-                  point: point,
-                  width: 40,
-                  height: 40,
-                  child: const Icon(
-                    Icons.location_pin,
-                    color: Colors.red,
-                    size: 34,
+            FlutterMap(
+              options: MapOptions(
+                initialCenter: point,
+                initialZoom: 15,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all,
+                ),
+              ),
+              children: [
+                if (isOnline)
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.kaushalyanxt_rfid',
                   ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: point,
+                      width: 40,
+                      height: 40,
+                      child: const Icon(
+                        Icons.location_pin,
+                        color: Colors.red,
+                        size: 34,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
+            if (!isOnline)
+              Container(
+                color: const Color(0xCCFFFFFF),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.all(12),
+                child: const Text(
+                  'Map preview is unavailable while offline.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF2E7D32),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

@@ -8,6 +8,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import '../../../core/services/local_cache_service.dart';
 import '../../../core/providers/connectivity_provider.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../farm_manager/presentation/farm_manager_data.dart';
 
 const String treeDocIdField = '_docId';
 
@@ -30,6 +31,105 @@ final treeIssueControllerProvider = Provider<TreeIssueController>((ref) {
     storage: ref.read(firebaseStorageProvider),
     cache: ref.read(localCacheServiceProvider),
   );
+});
+
+class FarmManagerAnalyticsData {
+  const FarmManagerAnalyticsData({
+    required this.scope,
+    required this.farms,
+    required this.trees,
+    required this.issues,
+    required this.generatedAt,
+  });
+
+  final FarmManagerScope scope;
+  final List<FarmManagerFarm> farms;
+  final List<Map<String, dynamic>> trees;
+  final List<FarmManagerIssue> issues;
+  final DateTime generatedAt;
+}
+
+final farmManagerAnalyticsProvider =
+    StreamProvider.autoDispose<FarmManagerAnalyticsData>((ref) async* {
+  final firestore = ref.read(firestoreProvider);
+  final scope = await loadFarmManagerScope();
+
+  yield* Stream<FarmManagerAnalyticsData>.multi((controller) {
+    QuerySnapshot<Map<String, dynamic>>? latestFarmSnapshot;
+    QuerySnapshot<Map<String, dynamic>>? latestTreeSnapshot;
+    QuerySnapshot<Map<String, dynamic>>? latestIssueSnapshot;
+
+    void emitAnalytics() {
+      final treeSnapshot = latestTreeSnapshot;
+      if (treeSnapshot == null) {
+        return;
+      }
+
+      final farmDocs = latestFarmSnapshot?.docs ??
+          const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+      final treeDocs = treeSnapshot.docs;
+      final scopedTrees = buildScopedTrees(treeDocs, scope);
+      final farms = buildFarmSummaries(
+        farmDocs: farmDocs,
+        scopedTrees: scopedTrees,
+        scope: scope,
+      );
+      final issues = latestIssueSnapshot == null
+          ? buildDerivedIssuesFromTrees(scopedTrees)
+          : buildIssueSummaries(
+              issueDocs: latestIssueSnapshot!.docs,
+              scopedTrees: scopedTrees,
+              scope: scope,
+            );
+
+      controller.add(
+        FarmManagerAnalyticsData(
+          scope: scope,
+          farms: farms,
+          trees: scopedTrees,
+          issues: issues,
+          generatedAt: DateTime.now(),
+        ),
+      );
+    }
+
+    final farmSubscription = firestore.collection('farms').snapshots().listen(
+      (snapshot) {
+        latestFarmSnapshot = snapshot;
+        emitAnalytics();
+      },
+      onError: (Object _, StackTrace __) {
+        latestFarmSnapshot = null;
+        emitAnalytics();
+      },
+    );
+
+    final treeSubscription = firestore.collection('trees').snapshots().listen(
+      (snapshot) {
+        latestTreeSnapshot = snapshot;
+        emitAnalytics();
+      },
+      onError: controller.addError,
+    );
+
+    final issueSubscription =
+        firestore.collectionGroup('issues').snapshots().listen(
+      (snapshot) {
+        latestIssueSnapshot = snapshot;
+        emitAnalytics();
+      },
+      onError: (Object _, StackTrace __) {
+        latestIssueSnapshot = null;
+        emitAnalytics();
+      },
+    );
+
+    controller.onCancel = () async {
+      await farmSubscription.cancel();
+      await treeSubscription.cancel();
+      await issueSubscription.cancel();
+    };
+  });
 });
 
 class _TreeOwnerQuery {

@@ -14,6 +14,9 @@ import '../../features/farm_manager/presentation/farm_manager_data.dart';
 import '../../features/farm_manager/presentation/screens/farm_detail_screen.dart';
 import '../../features/farm_manager/presentation/screens/farm_list_screen.dart';
 import '../../features/farm_manager/presentation/screens/issue_tracker_screen.dart';
+import '../../features/farm_manager/presentation/screens/analytics_screen.dart';
+import '../../features/farm_manager/presentation/screens/farmer_management_screen.dart';
+import '../../features/farm_manager/presentation/screens/managed_tree_list_screen.dart';
 import '../../features/admin/presentation/admin_dashboard.dart';
 import '../../features/farmer/my_trees/my_trees_screen.dart';
 import '../../features/farmer/profile/profile_screen.dart';
@@ -127,6 +130,11 @@ GoRouter createRouter(Ref ref) {
       ),
 
       GoRoute(
+        path: RoutePaths.farmManagerTrees,
+        builder: (context, state) => const ManagedTreeListScreen(),
+      ),
+
+      GoRoute(
         path: RoutePaths.farmManagerFarmDetails,
         builder: (context, state) => FarmDetailScreen(
           farm: state.extra as FarmManagerFarm?,
@@ -136,8 +144,27 @@ GoRouter createRouter(Ref ref) {
       GoRoute(
         path: RoutePaths.farmManagerIssues,
         builder: (context, state) => IssueTrackerScreen(
-          initialFarmFilter: state.uri.queryParameters['farm'] ?? '',
+          initialFarmId: state.uri.queryParameters['farmId'] ??
+              state.uri.queryParameters['farm'] ??
+              '',
+          initialFarmLabel: state.uri.queryParameters['farmLabel'] ?? '',
+          initialSeverity: state.uri.queryParameters['severity'] ?? 'All',
         ),
+      ),
+
+      GoRoute(
+        path: RoutePaths.farmManagerFarmers,
+        builder: (context, state) => FarmerManagementScreen(
+          initialFarmerId: state.uri.queryParameters['farmerId'] ?? '',
+          initialFarmerName: state.uri.queryParameters['farmerName'] ?? '',
+          initialFarmId: state.uri.queryParameters['farmId'] ?? '',
+          initialFarmLabel: state.uri.queryParameters['farmLabel'] ?? '',
+        ),
+      ),
+
+      GoRoute(
+        path: RoutePaths.farmManagerAnalytics,
+        builder: (context, state) => const AnalyticsScreen(),
       ),
 
       GoRoute(

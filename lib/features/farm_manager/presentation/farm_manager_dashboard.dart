@@ -10,6 +10,28 @@ import 'farm_manager_data.dart';
 class FarmManagerDashboard extends ConsumerWidget {
   const FarmManagerDashboard({super.key});
 
+  static String _issueTrackerLocation({
+    String farmId = '',
+    String farmLabel = '',
+    String severity = '',
+  }) {
+    final queryParameters = <String, String>{};
+    if (farmId.trim().isNotEmpty) {
+      queryParameters['farmId'] = farmId.trim();
+    }
+    if (farmLabel.trim().isNotEmpty) {
+      queryParameters['farmLabel'] = farmLabel.trim();
+    }
+    if (severity.trim().isNotEmpty) {
+      queryParameters['severity'] = severity.trim();
+    }
+
+    return Uri(
+      path: RoutePaths.farmManagerIssues,
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+    ).toString();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).user;
@@ -135,6 +157,11 @@ class FarmManagerDashboard extends ConsumerWidget {
                                         child: _DashboardCountCard(
                                           title: 'Total Managed Farms',
                                           value: '${farms.length}',
+                                          onTap: () {
+                                            context.push(
+                                              RoutePaths.farmManagerFarms,
+                                            );
+                                          },
                                         ),
                                       ),
                                       const SizedBox(width: 14),
@@ -142,6 +169,11 @@ class FarmManagerDashboard extends ConsumerWidget {
                                         child: _DashboardCountCard(
                                           title: 'Total Trees',
                                           value: '${scopedTrees.length}',
+                                          onTap: () {
+                                            context.push(
+                                              RoutePaths.farmManagerTrees,
+                                            );
+                                          },
                                         ),
                                       ),
                                     ],
@@ -152,12 +184,18 @@ class FarmManagerDashboard extends ConsumerWidget {
                                     moderateTrees: moderateTrees,
                                     criticalTrees: criticalTrees,
                                     totalTrees: scopedTrees.length,
+                                    onTap: () {
+                                      context.push(
+                                        RoutePaths.farmManagerAnalytics,
+                                      );
+                                    },
                                   ),
                                   const SizedBox(height: 18),
                                   _IssueTrackerBanner(
                                     onTap: () {
-                                      context
-                                          .push(RoutePaths.farmManagerIssues);
+                                      context.push(
+                                        RoutePaths.farmManagerIssues,
+                                      );
                                     },
                                   ),
                                   const SizedBox(height: 18),
@@ -167,6 +205,11 @@ class FarmManagerDashboard extends ConsumerWidget {
                                         child: _DashboardCountCard(
                                           title: 'Total Issues',
                                           value: '${issues.length}',
+                                          onTap: () {
+                                            context.push(
+                                              RoutePaths.farmManagerIssues,
+                                            );
+                                          },
                                         ),
                                       ),
                                       const SizedBox(width: 14),
@@ -174,6 +217,13 @@ class FarmManagerDashboard extends ConsumerWidget {
                                         child: _DashboardCountCard(
                                           title: 'Critical',
                                           value: '$criticalIssues',
+                                          onTap: () {
+                                            context.push(
+                                              _issueTrackerLocation(
+                                                severity: 'Critical',
+                                              ),
+                                            );
+                                          },
                                         ),
                                       ),
                                     ],
@@ -222,6 +272,15 @@ class FarmManagerDashboard extends ConsumerWidget {
                                               _alertBackground(issue.severity),
                                           iconColor: issueSeverityColor(
                                               issue.severity),
+                                          onTap: () {
+                                            context.push(
+                                              _issueTrackerLocation(
+                                                farmId: issue.farmId,
+                                                farmLabel: issue.farmLabel,
+                                                severity: issue.severity,
+                                              ),
+                                            );
+                                          },
                                         ),
                                       ),
                                     ),
@@ -239,7 +298,7 @@ class FarmManagerDashboard extends ConsumerWidget {
                                 context.push('/scan');
                               },
                               onAnalyticsTap: () {
-                                context.push('/report');
+                                context.push(RoutePaths.farmManagerAnalytics);
                               },
                               onProfileTap: () {
                                 context.push('/profile');
@@ -340,14 +399,16 @@ class _DashboardCountCard extends StatelessWidget {
   const _DashboardCountCard({
     required this.title,
     required this.value,
+    this.onTap,
   });
 
   final String title;
   final String value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
@@ -362,6 +423,14 @@ class _DashboardCountCard extends StatelessWidget {
       ),
       child: Column(
         children: [
+          if (onTap != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.black.withValues(alpha: 0.5),
+              ),
+            ),
           Text(
             title,
             textAlign: TextAlign.center,
@@ -382,6 +451,16 @@ class _DashboardCountCard extends StatelessWidget {
         ],
       ),
     );
+
+    if (onTap == null) {
+      return card;
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(26),
+      child: card,
+    );
   }
 }
 
@@ -391,12 +470,14 @@ class _HealthSummaryCard extends StatelessWidget {
     required this.moderateTrees,
     required this.criticalTrees,
     required this.totalTrees,
+    this.onTap,
   });
 
   final int healthyTrees;
   final int moderateTrees;
   final int criticalTrees;
   final int totalTrees;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -404,7 +485,7 @@ class _HealthSummaryCard extends StatelessWidget {
     final lowRatio = totalTrees == 0 ? 0.0 : moderateTrees / totalTrees;
     final highRatio = totalTrees == 0 ? 0.0 : criticalTrees / totalTrees;
 
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -420,12 +501,23 @@ class _HealthSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Healthy Summary',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Healthy Summary',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (onTap != null)
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.grey.shade500,
+                ),
+            ],
           ),
           const SizedBox(height: 18),
           Row(
@@ -524,6 +616,16 @@ class _HealthSummaryCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    if (onTap == null) {
+      return card;
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(28),
+      child: card,
     );
   }
 }
@@ -626,13 +728,13 @@ class _IssueTrackerBanner extends StatelessWidget {
         ),
         child: const Row(
           children: [
-            const Icon(
+            Icon(
               Icons.grid_view_rounded,
               color: Colors.white,
               size: 34,
             ),
-            const SizedBox(width: 14),
-            const Expanded(
+            SizedBox(width: 14),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -655,7 +757,7 @@ class _IssueTrackerBanner extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               Icons.chevron_right_rounded,
               color: Colors.white,
               size: 36,
@@ -673,16 +775,18 @@ class _AlertTile extends StatelessWidget {
     required this.message,
     required this.backgroundColor,
     required this.iconColor,
+    this.onTap,
   });
 
   final String title;
   final String message;
   final Color backgroundColor;
   final Color iconColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       decoration: BoxDecoration(
         color: backgroundColor,
@@ -719,8 +823,25 @@ class _AlertTile extends StatelessWidget {
               ],
             ),
           ),
+          if (onTap != null) ...[
+            const SizedBox(width: 10),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: iconColor,
+            ),
+          ],
         ],
       ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: content,
     );
   }
 }

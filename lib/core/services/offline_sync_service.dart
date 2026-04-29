@@ -11,6 +11,58 @@ class OfflineSyncService {
 
   bool _isSyncing = false;
 
+  Future<Map<String, String>> _currentManagerLinkFields(
+    User user,
+    Map<String, dynamic> tree,
+  ) async {
+    final cachedUser = await _cache.getUser();
+    final role = (cachedUser?.role ?? '').toString().trim().toLowerCase();
+    final cachedName = (cachedUser?.name ?? '').toString().trim();
+    final existingManagerId =
+        (tree['farmManagerId'] ?? tree['managerId'] ?? '').toString().trim();
+    final existingManagerName =
+        (tree['farmManagerName'] ?? '').toString().trim();
+    final existingManagerCode =
+        (tree['farmManagerCode'] ?? tree['managerCode'] ?? '')
+            .toString()
+            .trim();
+
+    final linkedManagerId = (cachedUser?.farmManagerId ?? '').toString().trim();
+    final linkedManagerName =
+        (cachedUser?.farmManagerName ?? '').toString().trim();
+    final linkedManagerCode =
+        (cachedUser?.farmManagerCode ?? '').toString().trim();
+    final ownManagerCode = (cachedUser?.managerCode ?? '').toString().trim();
+
+    final effectiveManagerId = existingManagerId.isNotEmpty
+        ? existingManagerId
+        : role == 'farm_manager'
+            ? user.uid
+            : linkedManagerId;
+    final effectiveManagerName = existingManagerName.isNotEmpty
+        ? existingManagerName
+        : role == 'farm_manager'
+            ? (cachedName.isNotEmpty
+                ? cachedName
+                : (tree['ownerName'] ?? tree['farmerName'] ?? '')
+                    .toString()
+                    .trim())
+            : linkedManagerName;
+    final effectiveManagerCode = existingManagerCode.isNotEmpty
+        ? existingManagerCode
+        : role == 'farm_manager'
+            ? ownManagerCode
+            : linkedManagerCode;
+
+    return <String, String>{
+      'managerId': effectiveManagerId,
+      'farmManagerId': effectiveManagerId,
+      'farmManagerName': effectiveManagerName,
+      'managerCode': effectiveManagerCode,
+      'farmManagerCode': effectiveManagerCode,
+    };
+  }
+
   Future<void> syncPendingTreeWrites() async {
     if (_isSyncing) return;
 
@@ -23,6 +75,7 @@ class OfflineSyncService {
       for (final tree in pending) {
         final docId = treeDocIdOf(tree);
         if (docId.isEmpty) continue;
+        final managerFields = await _currentManagerLinkFields(user, tree);
 
         final payload = <String, dynamic>{
           'treeId': (tree['treeId'] ?? '').toString(),
@@ -32,6 +85,7 @@ class OfflineSyncService {
           'ownerName': (tree['ownerName'] ?? '').toString(),
           'userId': user.uid,
           'userEmail': user.email ?? '',
+          ...managerFields,
           'healthStatus': (tree['healthStatus'] ?? '0').toString(),
           'healthStatusName': (tree['healthStatusName'] ?? '').toString(),
           'species': (tree['species'] ?? '').toString(),

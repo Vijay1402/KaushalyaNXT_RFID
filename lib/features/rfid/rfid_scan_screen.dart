@@ -781,6 +781,37 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     );
   }
 
+  Future<Map<String, String>> _currentManagerLinkFields(
+    User user, {
+    required String farmerName,
+  }) async {
+    final cachedUser = await LocalCacheService().getUser();
+    final role = (cachedUser?.role ?? '').toString().trim().toLowerCase();
+    final cachedName = (cachedUser?.name ?? '').toString().trim();
+    final ownManagerCode = (cachedUser?.managerCode ?? '').toString().trim();
+    final linkedManagerId = (cachedUser?.farmManagerId ?? '').toString().trim();
+    final linkedManagerName =
+        (cachedUser?.farmManagerName ?? '').toString().trim();
+    final linkedManagerCode =
+        (cachedUser?.farmManagerCode ?? '').toString().trim();
+
+    final effectiveManagerId =
+        role == 'farm_manager' ? user.uid : linkedManagerId;
+    final effectiveManagerName = role == 'farm_manager'
+        ? (cachedName.isNotEmpty ? cachedName : farmerName.trim())
+        : linkedManagerName;
+    final effectiveManagerCode =
+        role == 'farm_manager' ? ownManagerCode : linkedManagerCode;
+
+    return <String, String>{
+      'managerId': effectiveManagerId,
+      'farmManagerId': effectiveManagerId,
+      'farmManagerName': effectiveManagerName,
+      'managerCode': effectiveManagerCode,
+      'farmManagerCode': effectiveManagerCode,
+    };
+  }
+
   Future<String> _saveTreeToFirestore(TagData data) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -797,6 +828,10 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     final treeId = data.treeId.trim().isNotEmpty ? data.treeId.trim() : docId;
     final inspectionDate = DateTime.fromMillisecondsSinceEpoch(
       data.lastInspectionUnix * 1000,
+    );
+    final managerFields = await _currentManagerLinkFields(
+      user,
+      farmerName: data.farmerName,
     );
 
     final docRef = FirebaseFirestore.instance.collection('trees').doc(docId);
@@ -833,6 +868,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       'ownerName': data.farmerName.trim(),
       'userId': user.uid,
       'userEmail': user.email ?? '',
+      ...managerFields,
       'healthStatus': _firestoreHealthStatus(data.healthStatus),
       'healthStatusName': data.healthStatus.name,
       'species': _speciesLabel(data.species),
@@ -885,6 +921,10 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     final inspectionDate = DateTime.fromMillisecondsSinceEpoch(
       data.lastInspectionUnix * 1000,
     );
+    final managerFields = await _currentManagerLinkFields(
+      user,
+      farmerName: data.farmerName,
+    );
 
     final payload = <String, dynamic>{
       'treeId': treeId,
@@ -894,6 +934,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       'ownerName': data.farmerName.trim(),
       'userId': user.uid,
       'userEmail': user.email ?? '',
+      ...managerFields,
       'healthStatus': _firestoreHealthStatus(data.healthStatus),
       'healthStatusName': data.healthStatus.name,
       'species': _speciesLabel(data.species),
