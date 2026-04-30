@@ -1,6 +1,15 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:csv/csv.dart';
 
 import '../compare/models/compare_model.dart' as compare;
 import '../compare/presentation/select_trees_screen.dart';
@@ -14,12 +23,20 @@ class ManagedTreeListScreen extends StatefulWidget {
 }
 
 class _ManagedTreeListScreenState extends State<ManagedTreeListScreen> {
+  static const MethodChannel _fileSaveChannel = MethodChannel(
+    'com.example.kaushalyanxt_rfid/files',
+  );
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedTrees = <String>{};
   List<Map<String, dynamic>> _currentScopedTrees =
       const <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _currentVisibleTrees =
+      const <Map<String, dynamic>>[];
   String _search = '';
+  bool _exportingPdf = false;
+  bool _exportingExcel = false;
 
   @override
   void dispose() {
@@ -93,6 +110,219 @@ class _ManagedTreeListScreenState extends State<ManagedTreeListScreen> {
       health: healthLabel(tree['healthStatus']),
       sync: tree['isScanned'] == true ? 'Scanned' : 'Not Scanned',
     );
+  }
+
+  String _yieldLabel(Map<String, dynamic> tree) {
+    final yieldValue = firstNonEmptyString(
+      [
+        tree['lastYieldKg'],
+        tree['yieldKg'],
+        tree['yield'],
+      ],
+      fallback: 'Unknown',
+    );
+    return yieldValue == 'Unknown' ? yieldValue : '$yieldValue kg';
+  }
+
+  String _scanStatusLabel(Map<String, dynamic> tree) {
+    return tree['isScanned'] == true ? 'Scanned' : 'Not Scanned';
+  }
+
+  String _timestampLabel() {
+    return DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+  }
+
+  Future<String?> _saveBytesToDownloads({
+    required String fileName,
+    required String mimeType,
+    required List<int> bytes,
+  }) async {
+    if (Platform.isAndroid) {
+      try {
+        final savedLocation = await _fileSaveChannel.invokeMethod<String>(
+          'saveBytesToDownloads',
+          <String, dynamic>{
+            'fileName': fileName,
+            'mimeType': mimeType,
+            'bytes': Uint8List.fromList(bytes),
+          },
+        );
+        if (savedLocation != null && savedLocation.trim().isNotEmpty) {
+          return savedLocation;
+        }
+      } on PlatformException {
+        // Fall back to filesystem export below.
+      }
+    }
+
+    final downloadsDirectory = await getDownloadsDirectory();
+    final exportDirectory =
+        downloadsDirectory ?? await getApplicationDocumentsDirectory();
+    if (!await exportDirectory.exists()) {
+      await exportDirectory.create(recursive: true);
+    }
+
+    final file = File('${exportDirectory.path}/$fileName');
+    await file.writeAsBytes(bytes);
+    return file.path;
+  }
+
+  Future<void> _exportVisibleTreesPdf() async {
+    if (_currentVisibleTrees.isEmpty) {
+      _showMessage('No visible trees are available to export.');
+      return;
+    }
+
+    setState(() {
+      _exportingPdf = true;
+    });
+
+    try {
+      final document = pw.Document();
+      final generatedAt = DateTime.now();
+      final formatter = DateFormat('dd MMM yyyy, hh:mm a');
+      final rows = _currentVisibleTrees.map((tree) {
+        return <String>[
+          _treeLabel(tree),
+          farmerNameFromTree(tree),
+          farmNameFromTree(tree),
+          firstNonEmptyString([tree['location']], fallback: 'Not set'),
+          firstNonEmptyString([tree['species']], fallback: 'Not set'),
+          healthLabel(tree['healthStatus']),
+          _yieldLabel(tree),
+          _scanStatusLabel(tree),
+        ];
+      }).toList(growable: false);
+
+      document.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.all(24),
+          build: (context) => [
+            pw.Text(
+              'All Trees View Export',
+              style: pw.TextStyle(
+                fontSize: 20,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Text('Generated: ${formatter.format(generatedAt)}'),
+            pw.Text('Visible Trees: ${_currentVisibleTrees.length}'),
+            pw.SizedBox(height: 16),
+            pw.TableHelper.fromTextArray(
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              headerDecoration: const pw.BoxDecoration(
+                color: PdfColor(0.90, 0.95, 0.90),
+              ),
+              cellStyle: const pw.TextStyle(fontSize: 9),
+              headers: const <String>[
+                'Tree ID',
+                'Farmer',
+                'Farm',
+                'Location',
+                'Species',
+                'Health',
+                'Yield',
+                'Scan',
+              ],
+              data: rows,
+            ),
+          ],
+        ),
+      );
+
+      final fileName = 'all_trees_view_${_timestampLabel()}.pdf';
+      final savedPath = await _saveBytesToDownloads(
+        fileName: fileName,
+        mimeType: 'application/pdf',
+        bytes: await document.save(),
+      );
+
+      if (!mounted) return;
+      _showMessage(
+        savedPath == null ? 'PDF export completed.' : 'PDF saved to $savedPath',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('Failed to export PDF: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _exportingPdf = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _exportVisibleTreesExcel() async {
+    if (_currentVisibleTrees.isEmpty) {
+      _showMessage('No visible trees are available to export.');
+      return;
+    }
+
+    setState(() {
+      _exportingExcel = true;
+    });
+
+    try {
+      final rows = <List<String>>[
+        <String>[
+          'Tree ID',
+          'Farmer',
+          'Farm',
+          'Location',
+          'Species',
+          'Health',
+          'Yield',
+          'Scan Status',
+          'Tree Age',
+        ],
+        ..._currentVisibleTrees.map(
+          (tree) => <String>[
+            _treeLabel(tree),
+            farmerNameFromTree(tree),
+            farmNameFromTree(tree),
+            firstNonEmptyString([tree['location']], fallback: 'Not set'),
+            firstNonEmptyString([tree['species']], fallback: 'Not set'),
+            healthLabel(tree['healthStatus']),
+            _yieldLabel(tree),
+            _scanStatusLabel(tree),
+            firstNonEmptyString(
+              [
+                tree['treeAge'],
+                tree['age'],
+              ],
+              fallback: 'Unknown',
+            ),
+          ],
+        ),
+      ];
+
+      final csvContent = const ListToCsvConverter().convert(rows);
+      final fileName = 'all_trees_view_${_timestampLabel()}.csv';
+      final savedPath = await _saveBytesToDownloads(
+        fileName: fileName,
+        mimeType: 'text/csv',
+        bytes: utf8.encode(csvContent),
+      );
+
+      if (!mounted) return;
+      _showMessage(
+        savedPath == null
+            ? 'Excel export completed.'
+            : 'Excel export saved to $savedPath',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('Failed to export Excel file: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _exportingExcel = false;
+        });
+      }
+    }
   }
 
   void _openCompareFlow() {
@@ -235,10 +465,12 @@ class _ManagedTreeListScreenState extends State<ManagedTreeListScreen> {
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       _currentScopedTrees = const <Map<String, dynamic>>[];
+                      _currentVisibleTrees = const <Map<String, dynamic>>[];
                       return const Center(child: CircularProgressIndicator());
                     }
                     if (snapshot.hasError) {
                       _currentScopedTrees = const <Map<String, dynamic>>[];
+                      _currentVisibleTrees = const <Map<String, dynamic>>[];
                       return Center(child: Text('Error: ${snapshot.error}'));
                     }
 
@@ -263,6 +495,7 @@ class _ManagedTreeListScreenState extends State<ManagedTreeListScreen> {
                         (value) => value.toLowerCase().contains(_search),
                       );
                     }).toList(growable: false);
+                    _currentVisibleTrees = visibleTrees;
 
                     if (visibleTrees.isEmpty) {
                       final message = scopedTrees.isEmpty
@@ -332,46 +565,33 @@ class _ManagedTreeListScreenState extends State<ManagedTreeListScreen> {
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          _showMessage('Block action can be connected next.');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                        ),
-                        child: const Text('Block Action'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          _showMessage('Export PDF can be connected next.');
-                        },
+                        onPressed:
+                            _exportingPdf ? null : _exportVisibleTreesPdf,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(25),
                           ),
                         ),
-                        child: const Text('Export PDF'),
+                        child: Text(
+                          _exportingPdf ? 'Exporting...' : 'Export PDF',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          _showMessage('Export Excel can be connected next.');
-                        },
+                        onPressed:
+                            _exportingExcel ? null : _exportVisibleTreesExcel,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(25),
                           ),
                         ),
-                        child: const Text('Export Excel'),
+                        child: Text(
+                          _exportingExcel ? 'Exporting...' : 'Export Excel',
+                        ),
                       ),
                     ),
                   ],

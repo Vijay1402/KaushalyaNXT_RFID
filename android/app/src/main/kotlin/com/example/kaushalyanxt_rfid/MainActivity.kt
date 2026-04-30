@@ -1,13 +1,20 @@
 package com.example.kaushalyanxt_rfid
 
+import android.content.ContentValues
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.PrintWriter
 import java.io.StringWriter
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import com.rscja.deviceapi.RFIDWithUHFBLE
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import com.rscja.deviceapi.entity.UHFTAGInfo
 import com.rscja.deviceapi.interfaces.ConnectionStatus
@@ -16,6 +23,7 @@ import kotlin.concurrent.thread
 
 class MainActivity : FlutterActivity() {
     private val channelName = "com.reon.rfid"
+    private val fileChannelName = "com.example.kaushalyanxt_rfid/files"
 
     private var reader: RFIDWithUHFBLE? = null
     private var isInitialized: Boolean = false
@@ -220,6 +228,39 @@ class MainActivity : FlutterActivity() {
                     "getConnectionStatus" -> {
                         val status = reader?.connectStatus?.name ?: "DISCONNECTED"
                         result.success(status)
+                    }
+
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, fileChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "saveBytesToDownloads" -> {
+                        val fileName = call.argument<String>("fileName") ?: ""
+                        val mimeType = call.argument<String>("mimeType") ?: "application/octet-stream"
+                        val bytes = call.argument<ByteArray>("bytes")
+
+                        if (fileName.isBlank() || bytes == null) {
+                            result.error("INVALID_ARGS", "fileName and bytes are required", null)
+                            return@setMethodCallHandler
+                        }
+
+                        thread {
+                            try {
+                                val savedLocation = saveBytesToDownloads(
+                                    fileName = fileName,
+                                    mimeType = mimeType,
+                                    bytes = bytes
+                                )
+                                runOnUiThread { result.success(savedLocation) }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    fail(result, "SAVE_DOWNLOAD_ERROR", "saveBytesToDownloads", e)
+                                }
+                            }
+                        }
                     }
 
                     else -> result.notImplemented()
@@ -597,5 +638,56 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {} finally {
             try { r.stopInventory() } catch (_: Exception) {}
         }
+    }
+
+    private fun saveBytesToDownloads(
+        fileName: String,
+        mimeType: String,
+        bytes: ByteArray
+    ): String {
+        val safeFileName = fileName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = applicationContext.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, safeFileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IOException("Unable to create a download entry")
+
+            try {
+                resolver.openOutputStream(uri)?.use { outputStream ->
+                    outputStream.write(bytes)
+                    outputStream.flush()
+                } ?: throw IOException("Unable to open the download output stream")
+
+                values.clear()
+                values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+            } catch (e: Exception) {
+                resolver.delete(uri, null, null)
+                throw e
+            }
+
+            return "Download/$safeFileName"
+        }
+
+        val downloadsDirectory = Environment.getExternalStoragePublicDirectory(
+            Environment.DIRECTORY_DOWNLOADS
+        )
+        if (!downloadsDirectory.exists() && !downloadsDirectory.mkdirs()) {
+            throw IOException("Unable to create the Download directory")
+        }
+
+        val file = File(downloadsDirectory, safeFileName)
+        FileOutputStream(file).use { outputStream ->
+            outputStream.write(bytes)
+            outputStream.flush()
+        }
+        return file.absolutePath
     }
 }

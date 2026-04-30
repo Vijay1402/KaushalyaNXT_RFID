@@ -1,11 +1,16 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'analytics_pdf_export_data.dart';
+
+const MethodChannel _fileSaveChannel = MethodChannel(
+  'com.example.kaushalyanxt_rfid/files',
+);
 
 Future<String?> exportFarmManagerAnalyticsPdf(
   FarmManagerAnalyticsExportData data,
@@ -62,17 +67,37 @@ Future<String?> exportFarmManagerAnalyticsPdf(
     ),
   );
 
-  final directory = await getApplicationDocumentsDirectory();
-  final exportDirectory = Directory('${directory.path}/analytics_exports');
+  final timestamp = DateFormat('yyyyMMdd_HHmmss').format(data.generatedAt);
+  final fileName = 'farm_manager_analytics_$timestamp.pdf';
+  final pdfBytes = await document.save();
+
+  if (Platform.isAndroid) {
+    try {
+      final savedLocation = await _fileSaveChannel.invokeMethod<String>(
+        'saveBytesToDownloads',
+        <String, dynamic>{
+          'fileName': fileName,
+          'mimeType': 'application/pdf',
+          'bytes': pdfBytes,
+        },
+      );
+      if (savedLocation != null && savedLocation.trim().isNotEmpty) {
+        return savedLocation;
+      }
+    } on PlatformException {
+      // Fall back to a filesystem-based export when the platform save fails.
+    }
+  }
+
+  final downloadsDirectory = await getDownloadsDirectory();
+  final exportDirectory =
+      downloadsDirectory ?? await getApplicationDocumentsDirectory();
   if (!await exportDirectory.exists()) {
     await exportDirectory.create(recursive: true);
   }
 
-  final timestamp = DateFormat('yyyyMMdd_HHmmss').format(data.generatedAt);
-  final file = File(
-    '${exportDirectory.path}/farm_manager_analytics_$timestamp.pdf',
-  );
-  await file.writeAsBytes(await document.save());
+  final file = File('${exportDirectory.path}/$fileName');
+  await file.writeAsBytes(pdfBytes);
   return file.path;
 }
 

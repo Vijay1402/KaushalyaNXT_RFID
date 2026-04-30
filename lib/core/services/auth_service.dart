@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../data/models/user_model.dart';
 
@@ -97,6 +98,93 @@ class AuthService {
       farmManagerName: (data['farmManagerName'] ?? '').toString(),
       farmManagerCode: (data['farmManagerCode'] ?? '').toString(),
     );
+  }
+
+  ({
+    String managerCode,
+    String farmManagerId,
+    String farmManagerName,
+    String farmManagerCode,
+  }) _emptyRoleMetadata() {
+    return (
+      managerCode: '',
+      farmManagerId: '',
+      farmManagerName: '',
+      farmManagerCode: '',
+    );
+  }
+
+  Future<
+      ({
+        String managerCode,
+        String farmManagerId,
+        String farmManagerName,
+        String farmManagerCode,
+      })> _resolveRoleMetadata({
+    required String role,
+    required String name,
+    required String phone,
+    String requestedFarmManagerCode = '',
+    String existingManagerCode = '',
+  }) async {
+    final normalizedRole = _normalizedRole(role);
+
+    if (normalizedRole == 'farm_manager') {
+      final managerCode = existingManagerCode.trim().isNotEmpty
+          ? existingManagerCode.trim()
+          : await _generateUniqueManagerCode(name, phone);
+      return (
+        managerCode: managerCode,
+        farmManagerId: '',
+        farmManagerName: '',
+        farmManagerCode: '',
+      );
+    }
+
+    if (normalizedRole == 'farmer') {
+      final requestedCode = normalizeManagerCode(requestedFarmManagerCode);
+      if (requestedCode.isEmpty) {
+        return _emptyRoleMetadata();
+      }
+
+      final farmManager = await _findFarmManagerByCode(requestedCode);
+      if (farmManager == null) {
+        throw Exception(
+          "Invalid farm manager code. Please check and try again.",
+        );
+      }
+
+      return (
+        managerCode: '',
+        farmManagerId: farmManager['id'] ?? '',
+        farmManagerName: farmManager['name'] ?? '',
+        farmManagerCode: farmManager['managerCode'] ?? requestedCode,
+      );
+    }
+
+    return _emptyRoleMetadata();
+  }
+
+  Map<String, dynamic> _buildUserDocumentData({
+    required String name,
+    required String email,
+    required String role,
+    required String phone,
+    required String managerCode,
+    required String farmManagerId,
+    required String farmManagerName,
+    required String farmManagerCode,
+  }) {
+    return {
+      'name': name,
+      'email': email,
+      'role': role,
+      'phone': phone,
+      'managerCode': managerCode,
+      'farmManagerId': farmManagerId,
+      'farmManagerName': farmManagerName,
+      'farmManagerCode': farmManagerCode,
+    };
   }
 
   /// 🔐 CURRENT USER
@@ -245,29 +333,12 @@ class AuthService {
       final normalizedName = name.trim();
       final normalizedEmail = email.trim();
       final normalizedPhone = phone.trim();
-
-      String managerCode = '';
-      String linkedFarmManagerId = '';
-      String linkedFarmManagerName = '';
-      String linkedFarmManagerCode = '';
-
-      if (normalizedRole == 'farm_manager') {
-        managerCode =
-            await _generateUniqueManagerCode(normalizedName, normalizedPhone);
-      } else if (normalizedRole == 'farmer') {
-        final requestedManagerCode = normalizeManagerCode(farmManagerCode);
-        if (requestedManagerCode.isNotEmpty) {
-          final farmManager = await _findFarmManagerByCode(requestedManagerCode);
-          if (farmManager == null) {
-            throw Exception(
-              "Invalid farm manager code. Please check and try again.",
-            );
-          }
-          linkedFarmManagerId = farmManager['id'] ?? '';
-          linkedFarmManagerName = farmManager['name'] ?? '';
-          linkedFarmManagerCode = farmManager['managerCode'] ?? '';
-        }
-      }
+      final metadata = await _resolveRoleMetadata(
+        role: normalizedRole,
+        name: normalizedName,
+        phone: normalizedPhone,
+        requestedFarmManagerCode: farmManagerCode,
+      );
 
       final credential = await _auth.createUserWithEmailAndPassword(
         email: normalizedEmail,
@@ -279,26 +350,28 @@ class AuthService {
 
       await user.updateDisplayName(normalizedName);
 
-      await firestore.collection('users').doc(user.uid).set({
-        'name': normalizedName,
-        'email': normalizedEmail,
-        'role': role,
-        'phone': normalizedPhone,
-        'managerCode': managerCode,
-        'farmManagerId': linkedFarmManagerId,
-        'farmManagerName': linkedFarmManagerName,
-        'farmManagerCode': linkedFarmManagerCode,
-      });
+      await firestore.collection('users').doc(user.uid).set(
+            _buildUserDocumentData(
+              name: normalizedName,
+              email: normalizedEmail,
+              role: normalizedRole,
+              phone: normalizedPhone,
+              managerCode: metadata.managerCode,
+              farmManagerId: metadata.farmManagerId,
+              farmManagerName: metadata.farmManagerName,
+              farmManagerCode: metadata.farmManagerCode,
+            ),
+          );
 
       return UserModel(
         name: normalizedName,
         email: normalizedEmail,
-        role: role,
+        role: normalizedRole,
         phone: normalizedPhone,
-        managerCode: managerCode,
-        farmManagerId: linkedFarmManagerId,
-        farmManagerName: linkedFarmManagerName,
-        farmManagerCode: linkedFarmManagerCode,
+        managerCode: metadata.managerCode,
+        farmManagerId: metadata.farmManagerId,
+        farmManagerName: metadata.farmManagerName,
+        farmManagerCode: metadata.farmManagerCode,
       );
     } on FirebaseAuthException catch (e) {
       throw Exception(e.message ?? "Registration failed");
@@ -544,5 +617,211 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       throw Exception(e.message ?? "Password reset failed");
     }
+  }
+
+  Future<UserModel> createUserAsAdmin({
+    required String name,
+    required String email,
+    required String password,
+    required String role,
+    required String phone,
+    String farmManagerCode = '',
+  }) async {
+    final normalizedRole = _normalizedRole(role);
+    final normalizedName = name.trim();
+    final normalizedEmail = email.trim();
+    final normalizedPhone = phone.trim();
+
+    final metadata = await _resolveRoleMetadata(
+      role: normalizedRole,
+      name: normalizedName,
+      phone: normalizedPhone,
+      requestedFarmManagerCode: farmManagerCode,
+    );
+
+    final secondaryAppName =
+        'admin-user-create-${DateTime.now().microsecondsSinceEpoch}';
+    FirebaseApp? secondaryApp;
+    FirebaseAuth? secondaryAuth;
+    User? createdUser;
+
+    try {
+      secondaryApp = await Firebase.initializeApp(
+        name: secondaryAppName,
+        options: Firebase.app().options,
+      );
+      secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+
+      final credential = await secondaryAuth.createUserWithEmailAndPassword(
+        email: normalizedEmail,
+        password: password,
+      );
+
+      createdUser = credential.user;
+      if (createdUser == null) {
+        throw Exception("User creation failed");
+      }
+
+      await createdUser.updateDisplayName(normalizedName);
+
+      await firestore.collection('users').doc(createdUser.uid).set(
+            _buildUserDocumentData(
+              name: normalizedName,
+              email: normalizedEmail,
+              role: normalizedRole,
+              phone: normalizedPhone,
+              managerCode: metadata.managerCode,
+              farmManagerId: metadata.farmManagerId,
+              farmManagerName: metadata.farmManagerName,
+              farmManagerCode: metadata.farmManagerCode,
+            ),
+          );
+
+      return UserModel(
+        name: normalizedName,
+        email: normalizedEmail,
+        role: normalizedRole,
+        phone: normalizedPhone,
+        managerCode: metadata.managerCode,
+        farmManagerId: metadata.farmManagerId,
+        farmManagerName: metadata.farmManagerName,
+        farmManagerCode: metadata.farmManagerCode,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (createdUser != null) {
+        try {
+          await createdUser.delete();
+        } catch (_) {}
+      }
+      throw Exception(e.message ?? "Unable to create user");
+    } catch (e) {
+      if (createdUser != null) {
+        try {
+          await createdUser.delete();
+        } catch (_) {}
+      }
+      rethrow;
+    } finally {
+      if (secondaryAuth != null) {
+        try {
+          await secondaryAuth.signOut();
+        } catch (_) {}
+      }
+      if (secondaryApp != null) {
+        try {
+          await secondaryApp.delete();
+        } catch (_) {}
+      }
+    }
+  }
+
+  Future<UserModel> updateUserAsAdmin({
+    required String userId,
+    required String name,
+    required String phone,
+    String farmManagerCode = '',
+  }) async {
+    final normalizedName = name.trim();
+    final normalizedPhone = phone.trim();
+    final docRef = firestore.collection('users').doc(userId);
+    final doc = await docRef.get();
+
+    if (!doc.exists) {
+      throw Exception("User data not found in database");
+    }
+
+    final currentData = doc.data() ?? <String, dynamic>{};
+    final email = (currentData['email'] ?? '').toString().trim();
+    final role = (currentData['role'] ?? 'farmer').toString().trim();
+    final previousName = (currentData['name'] ?? '').toString().trim();
+    final existingManagerCode =
+        (currentData['managerCode'] ?? '').toString().trim();
+
+    final metadata = await _resolveRoleMetadata(
+      role: role,
+      name: normalizedName,
+      phone: normalizedPhone,
+      requestedFarmManagerCode: farmManagerCode,
+      existingManagerCode: existingManagerCode,
+    );
+
+    await docRef.set(
+      _buildUserDocumentData(
+        name: normalizedName,
+        email: email,
+        role: role,
+        phone: normalizedPhone,
+        managerCode: metadata.managerCode,
+        farmManagerId: metadata.farmManagerId,
+        farmManagerName: metadata.farmManagerName,
+        farmManagerCode: metadata.farmManagerCode,
+      ),
+      SetOptions(merge: true),
+    );
+
+    if (_normalizedRole(role) == 'farm_manager' &&
+        normalizedName.isNotEmpty &&
+        normalizedName != previousName) {
+      final linkedFarmers = await firestore
+          .collection('users')
+          .where('farmManagerId', isEqualTo: userId)
+          .get();
+
+      if (linkedFarmers.docs.isNotEmpty) {
+        final batch = firestore.batch();
+        for (final farmerDoc in linkedFarmers.docs) {
+          batch.update(farmerDoc.reference, {
+            'farmManagerName': normalizedName,
+          });
+        }
+        await batch.commit();
+      }
+    }
+
+    return UserModel(
+      name: normalizedName,
+      email: email,
+      role: role,
+      phone: normalizedPhone,
+      managerCode: metadata.managerCode,
+      farmManagerId: metadata.farmManagerId,
+      farmManagerName: metadata.farmManagerName,
+      farmManagerCode: metadata.farmManagerCode,
+    );
+  }
+
+  Future<void> removeUserAsAdmin({
+    required String userId,
+  }) async {
+    final docRef = firestore.collection('users').doc(userId);
+    final doc = await docRef.get();
+
+    if (!doc.exists) {
+      return;
+    }
+
+    final data = doc.data() ?? <String, dynamic>{};
+    final role = _normalizedRole((data['role'] ?? '').toString());
+
+    if (role == 'farm_manager') {
+      final linkedFarmers = await firestore
+          .collection('users')
+          .where('farmManagerId', isEqualTo: userId)
+          .get();
+
+      if (linkedFarmers.docs.isNotEmpty) {
+        final batch = firestore.batch();
+        for (final farmerDoc in linkedFarmers.docs) {
+          batch.update(farmerDoc.reference, {
+            'farmManagerId': '',
+            'farmManagerName': '',
+            'farmManagerCode': '',
+          });
+        }
+        await batch.commit();
+      }
+    }
+
+    await docRef.delete();
   }
 }

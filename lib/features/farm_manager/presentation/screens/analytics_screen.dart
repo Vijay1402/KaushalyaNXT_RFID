@@ -14,7 +14,12 @@ import '../utils/analytics_pdf_exporter.dart';
 import '../../../farmer/tree_details/tree_controller.dart';
 
 class AnalyticsScreen extends ConsumerStatefulWidget {
-  const AnalyticsScreen({super.key});
+  const AnalyticsScreen({
+    super.key,
+    this.showBottomNavigation = true,
+  });
+
+  final bool showBottomNavigation;
 
   @override
   ConsumerState<AnalyticsScreen> createState() => _AnalyticsScreenState();
@@ -266,13 +271,15 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F2),
-      bottomNavigationBar: _FarmManagerAnalyticsBottomNav(
-        onHomeTap: () => context.go(RoutePaths.farmManagerHome),
-        onFarmsTap: () => context.push(RoutePaths.farmManagerFarms),
-        onScanTap: () => context.push('/scan'),
-        onAnalyticsTap: () {},
-        onProfileTap: () => context.push('/profile'),
-      ),
+      bottomNavigationBar: widget.showBottomNavigation
+          ? _FarmManagerAnalyticsBottomNav(
+              onHomeTap: () => context.go(RoutePaths.farmManagerHome),
+              onFarmsTap: () => context.push(RoutePaths.farmManagerFarms),
+              onScanTap: () => context.push('/scan'),
+              onAnalyticsTap: () {},
+              onProfileTap: () => context.push('/profile'),
+            )
+          : null,
       body: SafeArea(
         child: analyticsAsync.when(
           loading: () => Column(

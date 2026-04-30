@@ -202,13 +202,26 @@ Future<FarmManagerScope> loadFarmManagerScope() async {
 
   final firestore = FirebaseFirestore.instance;
   String managerCode = '';
+  String currentRole = '';
 
   try {
     final managerDoc =
         await firestore.collection('users').doc(currentUser.uid).get();
     managerCode = (managerDoc.data()?['managerCode'] ?? '').toString().trim();
+    currentRole = (managerDoc.data()?['role'] ?? '').toString().trim();
   } catch (_) {
     managerCode = '';
+    currentRole = '';
+  }
+
+  if (currentRole.toLowerCase() == 'admin') {
+    return const FarmManagerScope(
+      managerUid: '',
+      managerEmail: '',
+      managerCode: '',
+      linkedFarmerIds: <String>{},
+      linkedFarmerEmails: <String>{},
+    );
   }
 
   final linkedFarmerIds = <String>{currentUser.uid};

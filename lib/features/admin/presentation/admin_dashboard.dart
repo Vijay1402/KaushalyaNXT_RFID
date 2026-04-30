@@ -1,150 +1,68 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../app/router/route_paths.dart';
-import '../../auth/providers/auth_provider.dart';
+import '../../farm_manager/presentation/screens/analytics_screen.dart';
+import '../../farm_manager/presentation/screens/issue_tracker_screen.dart';
+import '../../farm_manager/presentation/screens/managed_tree_list_screen.dart';
+import '../../farmer/reports/reports_screen.dart';
+import 'admin_user_management_screen.dart';
 
-class AdminDashboard extends ConsumerWidget {
+class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authStateProvider).user;
-    final name =
-        (user?.name.trim().isNotEmpty ?? false) ? user!.name.trim() : 'Admin';
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F2),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF264653),
-        foregroundColor: Colors.white,
-        title: const Text('Admin Dashboard'),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF264653)),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x14000000),
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome, $name',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF264653),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'You are logged in with the Admin role.',
-                      style: TextStyle(fontSize: 15, color: Colors.black87),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Expanded(
-                child: GridView.count(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 1.12,
-                  children: [
-                    _AdminCard(
-                      title: 'Reports',
-                      icon: Icons.assessment_outlined,
-                      onTap: () => context.push('/report'),
-                    ),
-                    _AdminCard(
-                      title: 'Activity Log',
-                      icon: Icons.history_rounded,
-                      onTap: () => context.push(RoutePaths.activityLog),
-                    ),
-                    _AdminCard(
-                      title: 'All Trees',
-                      icon: Icons.park_outlined,
-                      onTap: () => context.push('/my-trees'),
-                    ),
-                    _AdminCard(
-                      title: 'Profile',
-                      icon: Icons.admin_panel_settings_outlined,
-                      onTap: () => context.push('/profile'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
-class _AdminCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final VoidCallback onTap;
+class _AdminDashboardState extends State<AdminDashboard> {
+  int _currentIndex = 0;
 
-  const _AdminCard({
-    required this.title,
-    required this.icon,
-    required this.onTap,
-  });
+  late final List<Widget> _screens = const [
+    AdminUserManagementScreen(),
+    ManagedTreeListScreen(),
+    IssueTrackerScreen(),
+    AnalyticsScreen(showBottomNavigation: false),
+    ReportsScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFF264653)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x12000000),
-              blurRadius: 8,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: const Color(0xFF264653)),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-              ),
-            ),
-          ],
-        ),
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _currentIndex,
+        selectedItemColor: const Color(0xFF2E8933),
+        unselectedItemColor: Colors.grey.shade600,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_rounded),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.park_outlined),
+            label: 'My Trees',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.grid_view_rounded),
+            label: 'Issues',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart_rounded),
+            label: 'Analytics',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.description_outlined),
+            label: 'Report',
+          ),
+        ],
       ),
     );
   }
