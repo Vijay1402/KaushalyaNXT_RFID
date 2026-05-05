@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'app/router/router_provider.dart';
+import 'core/providers/firebase_providers.dart';
 import 'core/services/offline_sync_service.dart';
 import 'features/auth/providers/auth_provider.dart';
 
@@ -26,17 +27,18 @@ void main() async {
 }
 
 Future<void> _bootstrapApp(ProviderContainer container) async {
+  final firestore = container.read(firestoreProvider);
   final initialConnectivity = await Connectivity().checkConnectivity();
   if (initialConnectivity == ConnectivityResult.none) {
-    await FirebaseFirestore.instance.disableNetwork();
+    await firestore.disableNetwork();
   } else {
-    await FirebaseFirestore.instance.enableNetwork();
+    await firestore.enableNetwork();
   }
 
   await container.read(authStateProvider.notifier).checkLogin();
 
   if (initialConnectivity != ConnectivityResult.none) {
-    await OfflineSyncService().syncPendingTreeWrites();
+    await container.read(offlineSyncServiceProvider).syncPendingTreeWrites();
   }
 }
 
@@ -48,7 +50,6 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp> {
-  final OfflineSyncService _offlineSyncService = OfflineSyncService();
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
   @override
@@ -56,11 +57,13 @@ class _MyAppState extends ConsumerState<MyApp> {
     super.initState();
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
       (result) async {
+        final firestore = ref.read(firestoreProvider);
+        final offlineSyncService = ref.read(offlineSyncServiceProvider);
         if (result != ConnectivityResult.none) {
-          await FirebaseFirestore.instance.enableNetwork();
-          await _offlineSyncService.syncPendingTreeWrites();
+          await firestore.enableNetwork();
+          await offlineSyncService.syncPendingTreeWrites();
         } else {
-          await FirebaseFirestore.instance.disableNetwork();
+          await firestore.disableNetwork();
         }
       },
     );

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router/route_paths.dart';
+import '../../../core/providers/firebase_providers.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class AdminUserManagementScreen extends ConsumerStatefulWidget {
@@ -250,18 +251,26 @@ class _AdminUserManagementScreenState
     final adminName =
         (currentUser?.name.trim().isNotEmpty ?? false) ? currentUser!.name : '';
     final currentUserId = ref.read(authServiceProvider).getCurrentUser()?.uid;
+    final usersAsync = ref.watch(usersSnapshotsProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F1),
       body: SafeArea(
-        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection('users').snapshots(),
-          builder: (context, snapshot) {
-            final allUsers = snapshot.data?.docs
-                    .map(_AdminUserRecord.fromDoc)
-                    .toList(growable: false) ??
-                const <_AdminUserRecord>[];
-
+        child: usersAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Unable to load users: $error',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+          data: (snapshot) {
+            final allUsers = snapshot.docs
+                .map(_AdminUserRecord.fromDoc)
+                .toList(growable: false);
             final filteredUsers = _filterUsers(allUsers);
             final counts = _AdminUserCounts.from(allUsers);
 

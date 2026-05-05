@@ -1,21 +1,22 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_paths.dart';
 import '../../../../core/services/local_cache_service.dart';
+import '../../../../core/providers/firebase_providers.dart';
 import '../farm_manager_data.dart';
+import '../farm_manager_providers.dart';
 
-class FarmListScreen extends StatefulWidget {
+class FarmListScreen extends ConsumerStatefulWidget {
   const FarmListScreen({super.key});
 
   @override
-  State<FarmListScreen> createState() => _FarmListScreenState();
+  ConsumerState<FarmListScreen> createState() => _FarmListScreenState();
 }
 
-class _FarmListScreenState extends State<FarmListScreen> {
+class _FarmListScreenState extends ConsumerState<FarmListScreen> {
   final TextEditingController _searchController = TextEditingController();
   late Future<int> _pendingSyncFuture;
   String _search = '';
@@ -33,7 +34,7 @@ class _FarmListScreenState extends State<FarmListScreen> {
   }
 
   Future<int> _loadPendingSyncCount() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = ref.read(firebaseAuthProvider).currentUser;
     if (user == null) return 0;
 
     final cache = LocalCacheService();
@@ -51,6 +52,8 @@ class _FarmListScreenState extends State<FarmListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final overviewAsync = ref.watch(farmManagerOverviewProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F2),
       appBar: AppBar(
@@ -58,213 +61,170 @@ class _FarmListScreenState extends State<FarmListScreen> {
         foregroundColor: Colors.white,
         title: const Text('Farm Directory'),
       ),
-      body: FutureBuilder<FarmManagerScope>(
-        future: loadFarmManagerScope(),
-        builder: (context, scopeSnapshot) {
-          if (scopeSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: overviewAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(
+          child: Text(
+            'Unable to load farms: $error',
+          ),
+        ),
+        data: (overview) {
+          final scope = overview.scope;
+          final scopedTrees = overview.scopedTrees;
+          final farms = overview.farms;
+          final filteredFarms = farms.where((farm) {
+            final query = _search.trim().toLowerCase();
+            if (query.isEmpty) return true;
+            return farm.name.toLowerCase().contains(query) ||
+                farm.location.toLowerCase().contains(query) ||
+                farm.farmerName.toLowerCase().contains(query);
+          }).toList(growable: false);
 
-          final scope = scopeSnapshot.data ??
-              const FarmManagerScope(
-                managerUid: '',
-                managerEmail: '',
-                managerCode: '',
-                linkedFarmerIds: <String>{},
-                linkedFarmerEmails: <String>{},
-              );
+          final averageHealth = farms.isEmpty
+              ? 0
+              : (farms
+                          .map((farm) => farm.healthPercent)
+                          .reduce((left, right) => left + right) /
+                      farms.length)
+                  .round();
 
-          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('farms').snapshots(),
-            builder: (context, farmSnapshot) {
-              final farmDocs = farmSnapshot.data?.docs ??
-                  <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-
-              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream:
-                    FirebaseFirestore.instance.collection('trees').snapshots(),
-                builder: (context, treeSnapshot) {
-                  if (treeSnapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (treeSnapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        'Unable to load farms: ${treeSnapshot.error}',
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Column(
+                  children: [
+                    _SearchField(
+                      controller: _searchController,
+                      onChanged: (value) {
+                        setState(() {
+                          _search = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _SyncPanel(
+                      pendingSyncFuture: _pendingSyncFuture,
+                      onRefresh: _refreshSyncInfo,
+                    ),
+                    const SizedBox(height: 12),
+                    if (!scope.hasLinkedFarmers)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.amber.shade200),
+                        ),
+                        child: Text(
+                          scope.managerCode.isEmpty
+                              ? 'No farmers are linked to this manager account yet.'
+                              : 'No farmers are linked to manager code ${scope.managerCode} yet. Once a farmer uses this code, their farms and trees will appear here.',
+                          style: TextStyle(
+                            color: Colors.amber.shade900,
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
-                    );
-                  }
-
-                  final treeDocs = treeSnapshot.data?.docs ??
-                      <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                  final scopedTrees = buildScopedTrees(treeDocs, scope);
-                  final farms = buildFarmSummaries(
-                    farmDocs: farmDocs,
-                    scopedTrees: scopedTrees,
-                    scope: scope,
-                  );
-                  final filteredFarms = farms.where((farm) {
-                    final query = _search.trim().toLowerCase();
-                    if (query.isEmpty) return true;
-                    return farm.name.toLowerCase().contains(query) ||
-                        farm.location.toLowerCase().contains(query) ||
-                        farm.farmerName.toLowerCase().contains(query);
-                  }).toList(growable: false);
-
-                  final averageHealth = farms.isEmpty
-                      ? 0
-                      : (farms
-                                  .map((farm) => farm.healthPercent)
-                                  .reduce((left, right) => left + right) /
-                              farms.length)
-                          .round();
-
-                  return Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                        child: Column(
+                    if (!scope.hasLinkedFarmers) const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SummaryCard(
+                            icon: Icons.agriculture_outlined,
+                            title: 'Total Farms',
+                            value: '${farms.length}',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _SummaryCard(
+                            icon: Icons.eco_outlined,
+                            title: 'Avg Health',
+                            value: '$averageHealth%',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SummaryCard(
+                            icon: Icons.park_outlined,
+                            title: 'Total Trees',
+                            value: '${scopedTrees.length}',
+                            onTap: () {
+                              context.push(
+                                RoutePaths.farmManagerTrees,
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _SummaryCard(
+                            icon: Icons.groups_2_outlined,
+                            title: 'Farmers',
+                            value: '${uniqueFarmerCount(scopedTrees)}',
+                            onTap: () {
+                              context.push(
+                                RoutePaths.farmManagerFarmers,
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _refreshSyncInfo,
+                  child: filteredFarms.isEmpty
+                      ? ListView(
+                          padding: const EdgeInsets.all(24),
                           children: [
-                            _SearchField(
-                              controller: _searchController,
-                              onChanged: (value) {
-                                setState(() {
-                                  _search = value;
-                                });
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            _SyncPanel(
-                              pendingSyncFuture: _pendingSyncFuture,
-                              onRefresh: _refreshSyncInfo,
-                            ),
-                            const SizedBox(height: 12),
-                            if (!scope.hasLinkedFarmers)
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.shade50,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border:
-                                      Border.all(color: Colors.amber.shade200),
-                                ),
-                                child: Text(
-                                  scope.managerCode.isEmpty
-                                      ? 'No farmers are linked to this manager account yet.'
-                                      : 'No farmers are linked to manager code ${scope.managerCode} yet. Once a farmer uses this code, their farms and trees will appear here.',
-                                  style: TextStyle(
-                                    color: Colors.amber.shade900,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            if (!scope.hasLinkedFarmers)
-                              const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _SummaryCard(
-                                    icon: Icons.agriculture_outlined,
-                                    title: 'Total Farms',
-                                    value: '${farms.length}',
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _SummaryCard(
-                                    icon: Icons.eco_outlined,
-                                    title: 'Avg Health',
-                                    value: '$averageHealth%',
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _SummaryCard(
-                                    icon: Icons.park_outlined,
-                                    title: 'Total Trees',
-                                    value: '${scopedTrees.length}',
-                                    onTap: () {
-                                      context.push(
-                                        RoutePaths.farmManagerTrees,
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _SummaryCard(
-                                    icon: Icons.groups_2_outlined,
-                                    title: 'Farmers',
-                                    value: '${uniqueFarmerCount(scopedTrees)}',
-                                    onTap: () {
-                                      context.push(
-                                        RoutePaths.farmManagerFarmers,
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(height: 80),
+                            _EmptyState(
+                              title: scope.shouldFilter
+                                  ? 'No managed farms found'
+                                  : 'No farms found',
+                              message: scope.shouldFilter
+                                  ? scope.hasLinkedFarmers
+                                      ? 'No farm records were matched for the farmers linked to this manager yet.'
+                                      : scope.managerCode.isEmpty
+                                          ? 'No farmers are linked to this manager account yet.'
+                                          : 'Ask the farmer to register or log in using manager code ${scope.managerCode} to see their farms here.'
+                                  : 'Try a different search or add farm data to Firestore.',
                             ),
                           ],
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(
+                            16,
+                            0,
+                            16,
+                            20,
+                          ),
+                          itemCount: filteredFarms.length,
+                          itemBuilder: (context, index) {
+                            final farm = filteredFarms[index];
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                bottom:
+                                    index == filteredFarms.length - 1 ? 0 : 14,
+                              ),
+                              child: _FarmCard(farm: farm),
+                            );
+                          },
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: RefreshIndicator(
-                          onRefresh: _refreshSyncInfo,
-                          child: filteredFarms.isEmpty
-                              ? ListView(
-                                  padding: const EdgeInsets.all(24),
-                                  children: [
-                                    const SizedBox(height: 80),
-                                    _EmptyState(
-                                      title: scope.shouldFilter
-                                          ? 'No managed farms found'
-                                          : 'No farms found',
-                                      message: scope.shouldFilter
-                                          ? scope.hasLinkedFarmers
-                                              ? 'No farm records were matched for the farmers linked to this manager yet.'
-                                              : scope.managerCode.isEmpty
-                                                  ? 'No farmers are linked to this manager account yet.'
-                                                  : 'Ask the farmer to register or log in using manager code ${scope.managerCode} to see their farms here.'
-                                          : 'Try a different search or add farm data to Firestore.',
-                                    ),
-                                  ],
-                                )
-                              : ListView.builder(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    0,
-                                    16,
-                                    20,
-                                  ),
-                                  itemCount: filteredFarms.length,
-                                  itemBuilder: (context, index) {
-                                    final farm = filteredFarms[index];
-                                    return Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom:
-                                            index == filteredFarms.length - 1
-                                                ? 0
-                                                : 14,
-                                      ),
-                                      child: _FarmCard(farm: farm),
-                                    );
-                                  },
-                                ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
+                ),
+              ),
+            ],
           );
         },
       ),

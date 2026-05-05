@@ -188,8 +188,13 @@ class FarmManagerIssue {
   final DateTime? createdAt;
 }
 
-Future<FarmManagerScope> loadFarmManagerScope() async {
-  final currentUser = FirebaseAuth.instance.currentUser;
+Future<FarmManagerScope> loadFarmManagerScope({
+  FirebaseAuth? auth,
+  FirebaseFirestore? firestore,
+}) async {
+  final authInstance = auth ?? FirebaseAuth.instance;
+  final firestoreInstance = firestore ?? FirebaseFirestore.instance;
+  final currentUser = authInstance.currentUser;
   if (currentUser == null) {
     return const FarmManagerScope(
       managerUid: '',
@@ -200,13 +205,12 @@ Future<FarmManagerScope> loadFarmManagerScope() async {
     );
   }
 
-  final firestore = FirebaseFirestore.instance;
   String managerCode = '';
   String currentRole = '';
 
   try {
     final managerDoc =
-        await firestore.collection('users').doc(currentUser.uid).get();
+        await firestoreInstance.collection('users').doc(currentUser.uid).get();
     managerCode = (managerDoc.data()?['managerCode'] ?? '').toString().trim();
     currentRole = (managerDoc.data()?['role'] ?? '').toString().trim();
   } catch (_) {
@@ -232,7 +236,7 @@ Future<FarmManagerScope> loadFarmManagerScope() async {
   }
 
   try {
-    final linkedFarmers = await firestore
+    final linkedFarmers = await firestoreInstance
         .collection('users')
         .where('farmManagerId', isEqualTo: currentUser.uid)
         .get();
@@ -535,9 +539,10 @@ List<FarmManagerIssue> buildDerivedIssuesFromTrees(
 }
 
 Future<FarmManagerLinkedFarmer?> loadLinkedFarmerForFarm(
-  FarmManagerFarm farm,
-) async {
-  final firestore = FirebaseFirestore.instance;
+  FarmManagerFarm farm, {
+  FirebaseFirestore? firestore,
+}) async {
+  final firestoreInstance = firestore ?? FirebaseFirestore.instance;
 
   final candidateIds = <String>{
     farm.farmerId.trim(),
@@ -556,7 +561,8 @@ Future<FarmManagerLinkedFarmer?> loadLinkedFarmerForFarm(
 
   for (final candidateId in candidateIds) {
     try {
-      final doc = await firestore.collection('users').doc(candidateId).get();
+      final doc =
+          await firestoreInstance.collection('users').doc(candidateId).get();
       if (!doc.exists) {
         continue;
       }
@@ -586,7 +592,7 @@ Future<FarmManagerLinkedFarmer?> loadLinkedFarmerForFarm(
 
   for (final candidateEmail in candidateEmails) {
     try {
-      final snapshot = await firestore
+      final snapshot = await firestoreInstance
           .collection('users')
           .where('email', isEqualTo: candidateEmail)
           .limit(1)
@@ -604,14 +610,17 @@ Future<FarmManagerLinkedFarmer?> loadLinkedFarmerForFarm(
   return null;
 }
 
-Stream<List<FarmManagerManagedFarmer>> watchManagedFarmers() async* {
-  final currentUser = FirebaseAuth.instance.currentUser;
+Stream<List<FarmManagerManagedFarmer>> watchManagedFarmers({
+  FirebaseAuth? auth,
+  FirebaseFirestore? firestore,
+}) async* {
+  final authInstance = auth ?? FirebaseAuth.instance;
+  final firestoreInstance = firestore ?? FirebaseFirestore.instance;
+  final currentUser = authInstance.currentUser;
   if (currentUser == null) {
     yield const <FarmManagerManagedFarmer>[];
     return;
   }
-
-  final firestore = FirebaseFirestore.instance;
 
   yield* Stream<List<FarmManagerManagedFarmer>>.multi((controller) {
     QuerySnapshot<Map<String, dynamic>>? latestUsersSnapshot;
@@ -635,7 +644,7 @@ Stream<List<FarmManagerManagedFarmer>> watchManagedFarmers() async* {
       );
     }
 
-    final usersSubscription = firestore
+    final usersSubscription = firestoreInstance
         .collection('users')
         .where('farmManagerId', isEqualTo: currentUser.uid)
         .snapshots()
@@ -647,7 +656,8 @@ Stream<List<FarmManagerManagedFarmer>> watchManagedFarmers() async* {
       onError: controller.addError,
     );
 
-    final farmsSubscription = firestore.collection('farms').snapshots().listen(
+    final farmsSubscription =
+        firestoreInstance.collection('farms').snapshots().listen(
       (snapshot) {
         latestFarmsSnapshot = snapshot;
         emitManagedFarmers();
@@ -658,7 +668,8 @@ Stream<List<FarmManagerManagedFarmer>> watchManagedFarmers() async* {
       },
     );
 
-    final treesSubscription = firestore.collection('trees').snapshots().listen(
+    final treesSubscription =
+        firestoreInstance.collection('trees').snapshots().listen(
       (snapshot) {
         latestTreesSnapshot = snapshot;
         emitManagedFarmers();

@@ -1,10 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../farm_manager_data.dart';
+import '../farm_manager_providers.dart';
 
-class IssueTrackerScreen extends StatefulWidget {
+class IssueTrackerScreen extends ConsumerStatefulWidget {
   const IssueTrackerScreen({
     super.key,
     this.initialFarmId = '',
@@ -17,15 +18,13 @@ class IssueTrackerScreen extends StatefulWidget {
   final String initialSeverity;
 
   @override
-  State<IssueTrackerScreen> createState() => _IssueTrackerScreenState();
+  ConsumerState<IssueTrackerScreen> createState() => _IssueTrackerScreenState();
 }
 
-class _IssueTrackerScreenState extends State<IssueTrackerScreen> {
+class _IssueTrackerScreenState extends ConsumerState<IssueTrackerScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _search = '';
   String _selectedSeverity = 'All';
-  Future<List<FarmManagerIssue>>? _scopedIssueFuture;
-  String _scopedIssueKey = '';
 
   @override
   void initState() {
@@ -50,85 +49,6 @@ class _IssueTrackerScreenState extends State<IssueTrackerScreen> {
       default:
         return 'All';
     }
-  }
-
-  void _ensureScopedIssueFuture(
-    List<Map<String, dynamic>> scopedTrees,
-    FarmManagerScope scope,
-  ) {
-    final ids = scopedTrees
-        .map((tree) => (tree['_docId'] ?? '').toString().trim())
-        .where((id) => id.isNotEmpty)
-        .toList(growable: false)
-      ..sort();
-    final key = '${scope.managerUid}|${ids.join('|')}';
-
-    if (_scopedIssueKey == key && _scopedIssueFuture != null) {
-      return;
-    }
-
-    _scopedIssueKey = key;
-    _scopedIssueFuture = _loadScopedIssues(scopedTrees, scope);
-  }
-
-  Future<List<FarmManagerIssue>> _loadScopedIssues(
-    List<Map<String, dynamic>> scopedTrees,
-    FarmManagerScope scope,
-  ) async {
-    if (scopedTrees.isEmpty) {
-      try {
-        final snapshot =
-            await FirebaseFirestore.instance.collectionGroup('issues').get();
-        return buildIssueSummaries(
-          issueDocs: snapshot.docs,
-          scopedTrees: scopedTrees,
-          scope: scope,
-        );
-      } catch (_) {
-        return const [];
-      }
-    }
-
-    final issueGroups = await Future.wait(
-      scopedTrees.map((tree) async {
-        final treeDocId = (tree['_docId'] ?? '').toString().trim();
-        if (treeDocId.isEmpty) {
-          return <Map<String, dynamic>>[];
-        }
-
-        try {
-          final snapshot = await FirebaseFirestore.instance
-              .collection('trees')
-              .doc(treeDocId)
-              .collection('issues')
-              .get();
-
-          return snapshot.docs
-              .map(
-                (doc) => <String, dynamic>{
-                  '_docId': doc.id,
-                  ...doc.data(),
-                },
-              )
-              .toList(growable: false);
-        } catch (_) {
-          return <Map<String, dynamic>>[];
-        }
-      }),
-    );
-
-    final issueMaps =
-        issueGroups.expand((group) => group).toList(growable: false);
-
-    if (issueMaps.isEmpty) {
-      return buildDerivedIssuesFromTrees(scopedTrees);
-    }
-
-    return buildIssueSummariesFromMaps(
-      issueMaps: issueMaps,
-      scopedTrees: scopedTrees,
-      scope: scope,
-    );
   }
 
   Widget _buildIssueContent(
@@ -377,6 +297,8 @@ class _IssueTrackerScreenState extends State<IssueTrackerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final overviewAsync = ref.watch(farmManagerOverviewProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F2),
       appBar: AppBar(
@@ -384,111 +306,37 @@ class _IssueTrackerScreenState extends State<IssueTrackerScreen> {
         foregroundColor: Colors.white,
         title: const Text('Issue Tracker'),
       ),
-      body: FutureBuilder<FarmManagerScope>(
-        future: loadFarmManagerScope(),
-        builder: (context, scopeSnapshot) {
-          if (scopeSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+      body: overviewAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(
+          child: Text('Unable to load tree data: $error'),
+        ),
+        data: (overview) {
+          final scope = overview.scope;
+          final scopedTrees = overview.scopedTrees;
+
+          if (scope.shouldFilter && scopedTrees.isEmpty) {
+            return _buildIssueContent(
+              const <FarmManagerIssue>[],
+              helperMessage: scope.hasLinkedFarmers
+                  ? 'No issue-ready tree records were found for the farmers linked to this manager yet.'
+                  : scope.managerCode.isEmpty
+                      ? 'No farmers are linked to this manager account yet.'
+                      : 'No farmers are linked to manager code ${scope.managerCode} yet.',
+            );
           }
 
-          final scope = scopeSnapshot.data ??
-              const FarmManagerScope(
-                managerUid: '',
-                managerEmail: '',
-                managerCode: '',
-                linkedFarmerIds: <String>{},
-                linkedFarmerEmails: <String>{},
-              );
+          final helperMessage = scopedTrees.isNotEmpty
+              ? overview.usingDerivedIssues
+                  ? 'Issue subcollections are not readable for this role, so the tracker is showing health-based alerts from the managed trees instead.'
+                  : null
+              : overview.usingDerivedIssues
+                  ? 'Issue details are restricted by Firestore rules for this account. No accessible issue records were found yet.'
+                  : 'Showing the global issue feed because no manager scope was available for this session.';
 
-          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('trees').snapshots(),
-            builder: (context, treeSnapshot) {
-              if (treeSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (treeSnapshot.hasError) {
-                return Center(
-                  child:
-                      Text('Unable to load tree data: ${treeSnapshot.error}'),
-                );
-              }
-
-              final treeDocs = treeSnapshot.data?.docs ??
-                  <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-              final scopedTrees = buildScopedTrees(treeDocs, scope);
-
-              if (scope.shouldFilter && scopedTrees.isEmpty) {
-                return _buildIssueContent(
-                  const <FarmManagerIssue>[],
-                  helperMessage: scope.hasLinkedFarmers
-                      ? 'No issue-ready tree records were found for the farmers linked to this manager yet.'
-                      : scope.managerCode.isEmpty
-                          ? 'No farmers are linked to this manager account yet.'
-                          : 'No farmers are linked to manager code ${scope.managerCode} yet.',
-                );
-              }
-
-              if (scopedTrees.isNotEmpty) {
-                _ensureScopedIssueFuture(scopedTrees, scope);
-
-                return FutureBuilder<List<FarmManagerIssue>>(
-                  future: _scopedIssueFuture,
-                  builder: (context, scopedIssueSnapshot) {
-                    if (scopedIssueSnapshot.connectionState ==
-                            ConnectionState.waiting &&
-                        !scopedIssueSnapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    return _buildIssueContent(
-                      scopedIssueSnapshot.data ?? const <FarmManagerIssue>[],
-                      helperMessage: scopedIssueSnapshot.hasError
-                          ? 'Issue subcollections are not readable for this role, '
-                              'so the tracker is showing health-based alerts from '
-                              'the managed trees instead.'
-                          : null,
-                    );
-                  },
-                );
-              }
-
-              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collectionGroup('issues')
-                    .snapshots(),
-                builder: (context, issueSnapshot) {
-                  if (issueSnapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final issueDocs = issueSnapshot.data?.docs ??
-                      <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                  final issues = buildIssueSummaries(
-                    issueDocs: issueDocs,
-                    scopedTrees: const <Map<String, dynamic>>[],
-                    scope: const FarmManagerScope(
-                      managerUid: '',
-                      managerEmail: '',
-                      managerCode: '',
-                      linkedFarmerIds: <String>{},
-                      linkedFarmerEmails: <String>{},
-                    ),
-                  );
-
-                  return _buildIssueContent(
-                    issues,
-                    helperMessage: issueSnapshot.hasError
-                        ? 'Issue details are restricted by Firestore rules for '
-                            'this account. No accessible issue records were '
-                            'found yet.'
-                        : 'Showing the global issue feed because no manager scope '
-                            'was available for this session.',
-                  );
-                },
-              );
-            },
+          return _buildIssueContent(
+            overview.issues,
+            helperMessage: helperMessage,
           );
         },
       ),

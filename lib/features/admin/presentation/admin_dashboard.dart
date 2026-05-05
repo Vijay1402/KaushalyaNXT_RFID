@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'admin_farm_management_screen.dart';
 import '../../farm_manager/presentation/screens/analytics_screen.dart';
 import '../../farm_manager/presentation/screens/issue_tracker_screen.dart';
-import '../../farm_manager/presentation/screens/managed_tree_list_screen.dart';
 import '../../farmer/reports/reports_screen.dart';
 import 'admin_user_management_screen.dart';
 
@@ -18,7 +18,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   late final List<Widget> _screens = const [
     AdminUserManagementScreen(),
-    ManagedTreeListScreen(),
+    AdminFarmManagementScreen(),
     IssueTrackerScreen(),
     AnalyticsScreen(showBottomNavigation: false),
     ReportsScreen(),

@@ -628,7 +628,7 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
     final deviceLocation = await _getDeviceLocation();
     if (deviceLocation == null) return;
 
-    await FirebaseFirestore.instance.collection('trees').doc(docId).set({
+    await ref.read(firestoreProvider).collection('trees').doc(docId).set({
       'location': deviceLocation.locationName,
       'latitude': deviceLocation.latitude,
       'longitude': deviceLocation.longitude,

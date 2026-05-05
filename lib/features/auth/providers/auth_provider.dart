@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // ✅ ADD THIS
+import '../../../core/providers/firebase_providers.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/local_cache_service.dart';
 import '../../../data/models/user_model.dart';
@@ -29,7 +30,12 @@ class AuthState {
   }
 }
 
-final authServiceProvider = Provider((ref) => AuthService());
+final authServiceProvider = Provider((ref) {
+  return AuthService(
+    auth: ref.read(firebaseAuthProvider),
+    firestore: ref.read(firestoreProvider),
+  );
+});
 final localCacheServiceProvider = Provider((ref) => LocalCacheService());
 
 final authStateProvider = StateNotifierProvider<AuthController, AuthState>(

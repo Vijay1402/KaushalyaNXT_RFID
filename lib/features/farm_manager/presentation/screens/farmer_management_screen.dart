@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../farm_manager_data.dart';
+import '../farm_manager_providers.dart';
 
-class FarmerManagementScreen extends StatefulWidget {
+class FarmerManagementScreen extends ConsumerStatefulWidget {
   const FarmerManagementScreen({
     super.key,
     this.initialFarmerId = '',
@@ -19,18 +21,13 @@ class FarmerManagementScreen extends StatefulWidget {
   final String initialFarmLabel;
 
   @override
-  State<FarmerManagementScreen> createState() => _FarmerManagementScreenState();
+  ConsumerState<FarmerManagementScreen> createState() =>
+      _FarmerManagementScreenState();
 }
 
-class _FarmerManagementScreenState extends State<FarmerManagementScreen> {
-  late final Stream<List<FarmManagerManagedFarmer>> _managedFarmersStream;
+class _FarmerManagementScreenState
+    extends ConsumerState<FarmerManagementScreen> {
   String _searchText = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _managedFarmersStream = watchManagedFarmers();
-  }
 
   Future<void> _copyValue(String label, String value) async {
     if (value.trim().isEmpty) {
@@ -297,6 +294,8 @@ class _FarmerManagementScreenState extends State<FarmerManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final managedFarmersAsync = ref.watch(managedFarmersProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F5F1),
       appBar: AppBar(
@@ -304,28 +303,18 @@ class _FarmerManagementScreenState extends State<FarmerManagementScreen> {
         foregroundColor: Colors.white,
         title: const Text('Farmer Management'),
       ),
-      body: StreamBuilder<List<FarmManagerManagedFarmer>>(
-        stream: _managedFarmersStream,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Unable to load connected farmers: ${snapshot.error}',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
-
-          final allFarmers =
-              snapshot.data ?? const <FarmManagerManagedFarmer>[];
+      body: managedFarmersAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Unable to load connected farmers: $error',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        data: (allFarmers) {
           final visibleFarmers = _filteredFarmers(allFarmers);
           final totalAssignedFarms = allFarmers.fold<int>(
             0,

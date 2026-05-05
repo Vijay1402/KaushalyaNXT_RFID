@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ForgotPasswordScreen extends StatefulWidget {
+import '../providers/auth_provider.dart';
+
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() =>
+  ConsumerState<ForgotPasswordScreen> createState() =>
       _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState
-    extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final emailController = TextEditingController();
   bool isLoading = false;
 
   /// 🔥 EMAIL VALIDATION
   bool isValidEmail(String email) {
-    return RegExp(
-            r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$")
-        .hasMatch(email);
+    return RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$").hasMatch(email);
   }
 
   /// 🔥 FIREBASE RESET FUNCTION
@@ -38,8 +38,7 @@ class _ForgotPasswordScreenState
     try {
       setState(() => isLoading = true);
 
-      await FirebaseAuth.instance
-          .sendPasswordResetEmail(email: email);
+      await ref.read(authServiceProvider).sendPasswordResetEmail(email);
 
       if (!mounted) return;
 
@@ -109,8 +108,7 @@ class _ForgotPasswordScreenState
                     hintText: "Email Address",
                     border: InputBorder.none,
                     contentPadding:
-                        EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   ),
                 ),
               ),
@@ -122,23 +120,18 @@ class _ForgotPasswordScreenState
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed:
-                      isLoading ? null : resetPassword,
+                  onPressed: isLoading ? null : resetPassword,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        const Color(0xFF2E7D32),
+                    backgroundColor: const Color(0xFF2E7D32),
                     shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(30),
+                      borderRadius: BorderRadius.circular(30),
                     ),
                   ),
                   child: isLoading
-                      ? const CircularProgressIndicator(
-                          color: Colors.white)
+                      ? const CircularProgressIndicator(color: Colors.white)
                       : const Text(
                           "SEND RESET LINK",
-                          style:
-                              TextStyle(color: Colors.white),
+                          style: TextStyle(color: Colors.white),
                         ),
                 ),
               ),
@@ -153,8 +146,7 @@ class _ForgotPasswordScreenState
                     "Back to Login",
                     style: TextStyle(
                       color: Colors.blue,
-                      decoration:
-                          TextDecoration.underline,
+                      decoration: TextDecoration.underline,
                     ),
                   ),
                 ),

@@ -3,9 +3,12 @@
 // ============================================================
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../../../data/models/tree_model.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class TreePhotosScreen extends StatelessWidget {
+import '../../../data/models/tree_model.dart';
+import '../../../core/providers/firebase_providers.dart';
+
+class TreePhotosScreen extends ConsumerWidget {
   final Tree tree;
   final String treeDocId;
 
@@ -52,7 +55,9 @@ class TreePhotosScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final photosAsync = ref.watch(treeIssuePhotosProvider(treeDocId));
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -70,34 +75,15 @@ class TreePhotosScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        future: FirebaseFirestore.instance
-            .collection('trees')
-            .doc(treeDocId)
-            .collection('issues')
-            .where('hasImage', isEqualTo: true)
-            .get(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Failed to load photos from Firebase.',
-                style: TextStyle(color: Colors.grey.shade700),
-              ),
-            );
-          }
-
-          final docs = (snapshot.data?.docs ?? [])
-              .where(
-                (doc) =>
-                    (doc.data()['imageUrl'] ?? '').toString().trim().isNotEmpty,
-              )
-              .toList(growable: false);
-
+      body: photosAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => Center(
+          child: Text(
+            'Failed to load photos from Firebase.',
+            style: TextStyle(color: Colors.grey.shade700),
+          ),
+        ),
+        data: (docs) {
           if (docs.isEmpty) {
             return Center(
               child: Text(

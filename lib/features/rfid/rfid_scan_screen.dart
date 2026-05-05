@@ -2,6 +2,7 @@
 //  lib/features/rfid/rfid_scan_screen.dart   (NEW FILE)
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -13,6 +14,7 @@ import 'rfid_service.dart';
 import 'tag_protocol.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/router/route_paths.dart';
+import '../../core/providers/firebase_providers.dart';
 import '../../core/services/local_cache_service.dart';
 import '../farmer/tree_details/tree_controller.dart';
 
@@ -29,7 +31,7 @@ enum _ScanState {
   notFound,
 }
 
-class RFIDScanScreen extends StatefulWidget {
+class RFIDScanScreen extends ConsumerStatefulWidget {
   const RFIDScanScreen({super.key});
 
   static String? get rememberedDeviceAddress =>
@@ -38,10 +40,10 @@ class RFIDScanScreen extends StatefulWidget {
       _RFIDScanScreenState._rememberedDeviceName;
 
   @override
-  State<RFIDScanScreen> createState() => _RFIDScanScreenState();
+  ConsumerState<RFIDScanScreen> createState() => _RFIDScanScreenState();
 }
 
-class _RFIDScanScreenState extends State<RFIDScanScreen>
+class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
     with TickerProviderStateMixin {
   static String? _rememberedDeviceAddress;
   static String? _rememberedDeviceName;
@@ -568,7 +570,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     TagData data, {
     String? userHex,
   }) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = ref.read(firebaseAuthProvider).currentUser;
     if (user == null) return;
 
     await LocalCacheService().saveWrittenTag(
@@ -648,7 +650,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   }
 
   Future<void> _saveScanHistory(TagData data) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = ref.read(firebaseAuthProvider).currentUser;
     if (user == null) return;
 
     final cache = LocalCacheService();
@@ -656,7 +658,8 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     await cache.saveScanHistoryEntry(user.uid, entry);
 
     try {
-      await FirebaseFirestore.instance
+      await ref
+          .read(firestoreProvider)
           .collection('scan_history')
           .doc((entry['scanId'] ?? '').toString())
           .set({
@@ -684,7 +687,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
     String? epc,
     String? treeId,
   }) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = ref.read(firebaseAuthProvider).currentUser;
     if (user == null) return null;
 
     final local = LocalCacheService();
@@ -813,7 +816,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   }
 
   Future<String> _saveTreeToFirestore(TagData data) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = ref.read(firebaseAuthProvider).currentUser;
     if (user == null) {
       throw StateError('Please log in before saving trees.');
     }
@@ -834,7 +837,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
       farmerName: data.farmerName,
     );
 
-    final docRef = FirebaseFirestore.instance.collection('trees').doc(docId);
+    final docRef = ref.read(firestoreProvider).collection('trees').doc(docId);
     DocumentSnapshot<Map<String, dynamic>>? snapshot;
     String locationName = '';
     double latitude = _unknownCoordinate;
@@ -905,7 +908,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   }
 
   Future<String> _saveTreeLocally(TagData data) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = ref.read(firebaseAuthProvider).currentUser;
     if (user == null) {
       throw StateError('Please log in before saving trees.');
     }
@@ -1396,7 +1399,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
         if (online) {
           try {
             await _saveTreeToFirestore(updated);
-            final currentUser = FirebaseAuth.instance.currentUser;
+            final currentUser = ref.read(firebaseAuthProvider).currentUser;
             if (currentUser != null) {
               await LocalCacheService().removePendingTreeSync(
                 currentUser.uid,
@@ -1506,7 +1509,7 @@ class _RFIDScanScreenState extends State<RFIDScanScreen>
   }) async {
     final nowUnix = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final bool doPrefill = prefillUserData && initial != null;
-    final firebaseUser = FirebaseAuth.instance.currentUser;
+    final firebaseUser = ref.read(firebaseAuthProvider).currentUser;
     final cachedUser = await LocalCacheService().getUser();
     final registeredUserName =
         (firebaseUser?.displayName ?? '').trim().isNotEmpty

@@ -11,7 +11,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/router/route_paths.dart';
 import '../../../../core/providers/connectivity_provider.dart';
+import '../../../../core/providers/firebase_providers.dart';
 import '../farm_manager_data.dart';
+import '../farm_manager_providers.dart';
 
 class FarmDetailScreen extends ConsumerStatefulWidget {
   const FarmDetailScreen({
@@ -27,29 +29,13 @@ class FarmDetailScreen extends ConsumerStatefulWidget {
 
 class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
   final DateFormat _dateFormatter = DateFormat('dd MMM yyyy, hh:mm a');
-  Future<FarmManagerLinkedFarmer?>? _linkedFarmerFuture;
   LatLng? _userLocation;
   bool _loadingLocation = true;
 
   @override
   void initState() {
     super.initState();
-    _syncLinkedFarmerFuture();
     _loadUserLocation();
-  }
-
-  @override
-  void didUpdateWidget(covariant FarmDetailScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.farm?.id != widget.farm?.id) {
-      _syncLinkedFarmerFuture();
-    }
-  }
-
-  void _syncLinkedFarmerFuture() {
-    final farm = widget.farm;
-    _linkedFarmerFuture =
-        farm == null ? Future.value(null) : loadLinkedFarmerForFarm(farm);
   }
 
   Future<void> _loadUserLocation() async {
@@ -579,195 +565,202 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
   }
 
   Widget _buildLinkedFarmerSection(FarmManagerFarm farm) {
-    return FutureBuilder<FarmManagerLinkedFarmer?>(
-      future: _linkedFarmerFuture,
-      builder: (context, snapshot) {
-        final linkedFarmer = snapshot.data;
-        final farmerName = (linkedFarmer?.name.trim().isNotEmpty ?? false)
-            ? linkedFarmer!.name.trim()
-            : farm.farmerName;
-        final farmerPhone = (linkedFarmer?.phone.trim().isNotEmpty ?? false)
-            ? linkedFarmer!.phone.trim()
-            : farm.farmerPhone;
-        final farmerEmail = (linkedFarmer?.email.trim().isNotEmpty ?? false)
-            ? linkedFarmer!.email.trim()
-            : farm.farmerEmail;
-        final hasContact =
-            farmerPhone.trim().isNotEmpty || farmerEmail.trim().isNotEmpty;
-        final roleLabel = (linkedFarmer?.role.trim().isNotEmpty ?? false)
-            ? linkedFarmer!.role.trim().replaceAll('_', ' ')
-            : 'farmer';
-        final managerCode =
-            (linkedFarmer?.farmManagerCode.trim().isNotEmpty ?? false)
-                ? linkedFarmer!.farmManagerCode.trim()
-                : firstNonEmptyString(
-                    farm.trees.map((tree) => tree['farmManagerCode']).toList(),
-                  );
-        final managerName =
-            (linkedFarmer?.farmManagerName.trim().isNotEmpty ?? false)
-                ? linkedFarmer!.farmManagerName.trim()
-                : '';
-        final farmerId = (linkedFarmer?.id.trim().isNotEmpty ?? false)
-            ? linkedFarmer!.id.trim()
-            : farm.farmerId;
+    final linkedFarmerAsync = ref.watch(linkedFarmerForFarmProvider(farm));
 
-        return InkWell(
-          onTap: () => _openFarmerManagementScreen(
-            farm: farm,
-            linkedFarmer: linkedFarmer,
-          ),
-          borderRadius: BorderRadius.circular(18),
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: Colors.green.shade100,
-                      child: Text(
-                        initialsFor(farmerName),
-                        style: TextStyle(
-                          color: Colors.green.shade800,
-                          fontWeight: FontWeight.w700,
+    Widget buildSection(
+      FarmManagerLinkedFarmer? linkedFarmer, {
+      bool showFallbackMessage = false,
+      bool isLoading = false,
+    }) {
+      final farmerName = (linkedFarmer?.name.trim().isNotEmpty ?? false)
+          ? linkedFarmer!.name.trim()
+          : farm.farmerName;
+      final farmerPhone = (linkedFarmer?.phone.trim().isNotEmpty ?? false)
+          ? linkedFarmer!.phone.trim()
+          : farm.farmerPhone;
+      final farmerEmail = (linkedFarmer?.email.trim().isNotEmpty ?? false)
+          ? linkedFarmer!.email.trim()
+          : farm.farmerEmail;
+      final hasContact =
+          farmerPhone.trim().isNotEmpty || farmerEmail.trim().isNotEmpty;
+      final roleLabel = (linkedFarmer?.role.trim().isNotEmpty ?? false)
+          ? linkedFarmer!.role.trim().replaceAll('_', ' ')
+          : 'farmer';
+      final managerCode =
+          (linkedFarmer?.farmManagerCode.trim().isNotEmpty ?? false)
+              ? linkedFarmer!.farmManagerCode.trim()
+              : firstNonEmptyString(
+                  farm.trees.map((tree) => tree['farmManagerCode']).toList(),
+                );
+      final managerName =
+          (linkedFarmer?.farmManagerName.trim().isNotEmpty ?? false)
+              ? linkedFarmer!.farmManagerName.trim()
+              : '';
+      final farmerId = (linkedFarmer?.id.trim().isNotEmpty ?? false)
+          ? linkedFarmer!.id.trim()
+          : farm.farmerId;
+
+      return InkWell(
+        onTap: () => _openFarmerManagementScreen(
+          farm: farm,
+          linkedFarmer: linkedFarmer,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: Colors.green.shade100,
+                    child: Text(
+                      initialsFor(farmerName),
+                      style: TextStyle(
+                        color: Colors.green.shade800,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          farmerName.isEmpty ? 'Linked farmer' : farmerName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        Text(
+                          farmerId.isEmpty
+                              ? 'Tap to open connected farmer details'
+                              : 'Farmer ID: $farmerId',
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            farmerName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            farmerPhone.isNotEmpty
-                                ? farmerPhone
-                                : farmerEmail.isNotEmpty
-                                    ? farmerEmail
-                                    : 'No contact details available',
-                            style: TextStyle(
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              _TreeSummaryPill(
-                                icon: Icons.person_outline,
-                                label: _roleLabel(roleLabel),
-                                color: Colors.green.shade700,
-                              ),
-                              if (managerCode.isNotEmpty)
-                                _TreeSummaryPill(
-                                  icon: Icons.link_outlined,
-                                  label: 'Code $managerCode',
-                                  color: Colors.teal.shade700,
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: Colors.grey.shade500,
-                    ),
-                  ],
-                ),
-                if (snapshot.connectionState == ConnectionState.waiting) ...[
-                  const SizedBox(height: 12),
-                  const LinearProgressIndicator(minHeight: 3),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.grey.shade500,
+                  ),
                 ],
-                const SizedBox(height: 14),
-                _DetailRow(
-                  label: 'Farmer ID',
-                  value: farmerId.isEmpty ? 'Not available' : farmerId,
-                ),
-                _DetailRow(
-                  label: 'Phone',
-                  value: farmerPhone.isEmpty ? 'Not available' : farmerPhone,
-                ),
-                _DetailRow(
-                  label: 'Email',
-                  value: farmerEmail.isEmpty ? 'Not available' : farmerEmail,
-                ),
-                _DetailRow(
-                  label: 'Linked To',
-                  value: managerName.isEmpty && managerCode.isEmpty
-                      ? 'Manager link not available'
-                      : managerName.isEmpty
-                          ? managerCode
-                          : managerCode.isEmpty
-                              ? managerName
-                              : '$managerName ($managerCode)',
-                ),
+              ),
+              if (isLoading) ...[
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _ActionChipButton(
-                      icon: Icons.call_outlined,
-                      label: 'Call',
-                      onTap: farmerPhone.isEmpty
-                          ? null
-                          : () => _openPhone(farmerPhone),
-                    ),
-                    _ActionChipButton(
-                      icon: Icons.mail_outline,
-                      label: 'Email',
-                      onTap: farmerEmail.isEmpty
-                          ? null
-                          : () => _openEmail(farmerEmail),
-                    ),
-                    _ActionChipButton(
-                      icon: Icons.copy_outlined,
-                      label: 'Copy',
-                      onTap: hasContact
-                          ? () => _copyToClipboard(
-                                farmerPhone.isNotEmpty
-                                    ? farmerPhone
-                                    : farmerEmail,
-                                'Farmer contact',
-                              )
-                          : null,
-                    ),
-                    _ActionChipButton(
-                      icon: Icons.groups_outlined,
-                      label: 'Manage',
-                      onTap: () => _openFarmerManagementScreen(
-                        farm: farm,
-                        linkedFarmer: linkedFarmer,
-                      ),
-                    ),
-                  ],
+                const LinearProgressIndicator(minHeight: 3),
+              ],
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _DetailPill(
+                    icon: Icons.call_outlined,
+                    label: farmerPhone.isEmpty ? 'No phone' : farmerPhone,
+                  ),
+                  _DetailPill(
+                    icon: Icons.mail_outline,
+                    label: farmerEmail.isEmpty ? 'No email' : farmerEmail,
+                  ),
+                  _DetailPill(
+                    icon: Icons.link_outlined,
+                    label: managerCode.isEmpty
+                        ? 'No manager code'
+                        : 'Code $managerCode',
+                  ),
+                ],
+              ),
+              if (managerName.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Linked by $managerName',
+                  style: TextStyle(color: Colors.grey.shade700),
                 ),
-                if (snapshot.hasError) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Linked farmer profile could not be loaded, so this view is using farm and tree records.',
-                    style: TextStyle(
-                      color: Colors.orange.shade800,
-                      fontSize: 12,
+              ],
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _ActionChipButton(
+                    icon: Icons.call_outlined,
+                    label: 'Call',
+                    onTap: farmerPhone.isEmpty
+                        ? null
+                        : () => _openPhone(farmerPhone),
+                  ),
+                  _ActionChipButton(
+                    icon: Icons.mail_outline,
+                    label: 'Email',
+                    onTap: farmerEmail.isEmpty
+                        ? null
+                        : () => _openEmail(farmerEmail),
+                  ),
+                  _ActionChipButton(
+                    icon: Icons.copy_outlined,
+                    label: 'Copy',
+                    onTap: hasContact
+                        ? () => _copyToClipboard(
+                              farmerPhone.isNotEmpty
+                                  ? farmerPhone
+                                  : farmerEmail,
+                              'Farmer contact',
+                            )
+                        : null,
+                  ),
+                  _ActionChipButton(
+                    icon: Icons.groups_outlined,
+                    label: 'Manage',
+                    onTap: () => _openFarmerManagementScreen(
+                      farm: farm,
+                      linkedFarmer: linkedFarmer,
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              _DetailRow(
+                label: 'Role',
+                value: _roleLabel(roleLabel),
+              ),
+              _DetailRow(
+                label: 'Linked To',
+                value: managerName.isEmpty && managerCode.isEmpty
+                    ? 'Manager link not available'
+                    : managerName.isEmpty
+                        ? managerCode
+                        : managerCode.isEmpty
+                            ? managerName
+                            : '$managerName ($managerCode)',
+              ),
+              if (showFallbackMessage) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Linked farmer profile could not be loaded, so this view is using farm and tree records.',
+                  style: TextStyle(
+                    color: Colors.orange.shade800,
+                    fontSize: 12,
+                  ),
+                ),
               ],
-            ),
+            ],
           ),
-        );
-      },
+        ),
+      );
+    }
+
+    return linkedFarmerAsync.when(
+      loading: () => buildSection(null, isLoading: true),
+      error: (_, __) => buildSection(null, showFallbackMessage: true),
+      data: (linkedFarmer) => buildSection(linkedFarmer),
     );
   }
 
@@ -842,357 +835,345 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
         : treeMarkers.isNotEmpty
             ? treeMarkers.first.point.longitude
             : null;
+    final issueDocs = ref.watch(issuesSnapshotsProvider).valueOrNull?.docs ??
+        const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    final issues = buildIssueSummaries(
+      issueDocs: issueDocs,
+      scopedTrees: farm.trees,
+      scope: const FarmManagerScope(
+        managerUid: '',
+        managerEmail: '',
+        managerCode: '',
+        linkedFarmerIds: <String>{},
+        linkedFarmerEmails: <String>{},
+      ),
+    ).where((issue) => treeIds.contains(issue.treeDocId)).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F2),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream:
-            FirebaseFirestore.instance.collectionGroup('issues').snapshots(),
-        builder: (context, snapshot) {
-          final issueDocs = snapshot.data?.docs ??
-              <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-          final issues = buildIssueSummaries(
-            issueDocs: issueDocs,
-            scopedTrees: farm.trees,
-            scope: const FarmManagerScope(
-              managerUid: '',
-              managerEmail: '',
-              managerCode: '',
-              linkedFarmerIds: <String>{},
-              linkedFarmerEmails: <String>{},
-            ),
-          ).where((issue) => treeIds.contains(issue.treeDocId)).toList();
-
-          return CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                pinned: true,
-                expandedHeight: 180,
-                backgroundColor: Colors.green.shade800,
-                foregroundColor: Colors.white,
-                flexibleSpace: FlexibleSpaceBar(
-                  titlePadding:
-                      const EdgeInsetsDirectional.only(start: 16, bottom: 16),
-                  title: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        farm.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 20,
-                        ),
-                      ),
-                      Text(
-                        farm.location,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                  background: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.green.shade900,
-                          Colors.green.shade500,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 180,
+            backgroundColor: Colors.green.shade800,
+            foregroundColor: Colors.white,
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding:
+                  const EdgeInsetsDirectional.only(start: 16, bottom: 16),
+              title: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    farm.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 20,
                     ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Align(
-                          alignment: Alignment.topLeft,
-                          child: Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              _HeroChip(
-                                icon: Icons.park_outlined,
-                                label: '${farm.totalTrees} trees',
-                              ),
-                              _HeroChip(
-                                icon: Icons.favorite_outline,
-                                label: '${farm.healthPercent}% healthy',
-                              ),
-                              _HeroChip(
-                                icon: Icons.warning_amber_rounded,
-                                label: issues.isEmpty
-                                    ? 'No issues'
-                                    : '${issues.length} issues',
-                              ),
-                            ],
+                  ),
+                  Text(
+                    farm.location,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.green.shade900,
+                      Colors.green.shade500,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _HeroChip(
+                            icon: Icons.park_outlined,
+                            label: '${farm.totalTrees} trees',
                           ),
-                        ),
+                          _HeroChip(
+                            icon: Icons.favorite_outline,
+                            label: '${farm.healthPercent}% healthy',
+                          ),
+                          _HeroChip(
+                            icon: Icons.warning_amber_rounded,
+                            label: issues.isEmpty
+                                ? 'No issues'
+                                : '${issues.length} issues',
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ),
-              SliverPadding(
-                padding: const EdgeInsets.all(16),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate(
-                    [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _MetricCard(
-                              title: 'Alerts',
-                              value: '${farm.alertCount}',
-                              icon: Icons.warning_amber_rounded,
-                              color: farm.alertCount == 0
-                                  ? Colors.green
-                                  : Colors.orange,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _MetricCard(
-                              title: 'Scanned',
-                              value: '${farm.scannedTrees}/${farm.totalTrees}',
-                              icon: Icons.sync_outlined,
-                              color: Colors.teal,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _SectionCard(
-                        title: 'Linked Farmer Details',
-                        actionLabel: 'Open',
-                        onActionTap: () => _openFarmerManagementScreen(
-                          farm: farm,
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(
+                [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _MetricCard(
+                          title: 'Alerts',
+                          value: '${farm.alertCount}',
+                          icon: Icons.warning_amber_rounded,
+                          color: farm.alertCount == 0
+                              ? Colors.green
+                              : Colors.orange,
                         ),
-                        child: _buildLinkedFarmerSection(farm),
                       ),
-                      const SizedBox(height: 16),
-                      _SectionCard(
-                        title: 'Farm Map',
-                        actionLabel: issues.isEmpty ? null : 'Issue tracker',
-                        onActionTap: issues.isEmpty
-                            ? null
-                            : () {
-                                context.push(
-                                  '${RoutePaths.farmManagerIssues}?farmId='
-                                  '${Uri.encodeComponent(farm.id)}&farmLabel='
-                                  '${Uri.encodeComponent(farm.name)}',
-                                );
-                              },
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              height: 230,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(18),
-                                child: Stack(
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _MetricCard(
+                          title: 'Scanned',
+                          value: '${farm.scannedTrees}/${farm.totalTrees}',
+                          icon: Icons.sync_outlined,
+                          color: Colors.teal,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _SectionCard(
+                    title: 'Linked Farmer Details',
+                    actionLabel: 'Open',
+                    onActionTap: () => _openFarmerManagementScreen(
+                      farm: farm,
+                    ),
+                    child: _buildLinkedFarmerSection(farm),
+                  ),
+                  const SizedBox(height: 16),
+                  _SectionCard(
+                    title: 'Farm Map',
+                    actionLabel: issues.isEmpty ? null : 'Issue tracker',
+                    onActionTap: issues.isEmpty
+                        ? null
+                        : () {
+                            context.push(
+                              '${RoutePaths.farmManagerIssues}?farmId='
+                              '${Uri.encodeComponent(farm.id)}&farmLabel='
+                              '${Uri.encodeComponent(farm.name)}',
+                            );
+                          },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          height: 230,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: Stack(
+                              children: [
+                                FlutterMap(
+                                  options: MapOptions(
+                                    initialCenter: center,
+                                    initialZoom: 15,
+                                  ),
                                   children: [
-                                    FlutterMap(
-                                      options: MapOptions(
-                                        initialCenter: center,
-                                        initialZoom: 15,
+                                    if (isOnline)
+                                      TileLayer(
+                                        urlTemplate:
+                                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                        userAgentPackageName:
+                                            'com.example.kaushalyanxt_rfid',
                                       ),
-                                      children: [
-                                        if (isOnline)
-                                          TileLayer(
-                                            urlTemplate:
-                                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                            userAgentPackageName:
-                                                'com.example.kaushalyanxt_rfid',
-                                          ),
-                                        MarkerLayer(
-                                          markers: [
-                                            if (farm.hasCoordinates)
-                                              Marker(
-                                                point: LatLng(
-                                                  farm.latitude!,
-                                                  farm.longitude!,
-                                                ),
-                                                width: 40,
-                                                height: 40,
-                                                child: const Icon(
-                                                  Icons.agriculture_rounded,
-                                                  color: Colors.green,
-                                                  size: 32,
-                                                ),
-                                              ),
-                                            ...treeMarkers.map(
-                                              (tree) => Marker(
-                                                point: tree.point,
-                                                width: 34,
-                                                height: 34,
-                                                child: Icon(
-                                                  Icons.park,
-                                                  color:
-                                                      healthColor(tree.health),
-                                                  size: 24,
-                                                ),
-                                              ),
+                                    MarkerLayer(
+                                      markers: [
+                                        if (farm.hasCoordinates)
+                                          Marker(
+                                            point: LatLng(
+                                              farm.latitude!,
+                                              farm.longitude!,
                                             ),
-                                            if (_userLocation != null)
-                                              Marker(
-                                                point: _userLocation!,
-                                                width: 34,
-                                                height: 34,
-                                                child: const Icon(
-                                                  Icons.location_pin,
-                                                  color: Colors.red,
-                                                  size: 28,
-                                                ),
-                                              ),
-                                          ],
+                                            width: 40,
+                                            height: 40,
+                                            child: const Icon(
+                                              Icons.agriculture_rounded,
+                                              color: Colors.green,
+                                              size: 32,
+                                            ),
+                                          ),
+                                        ...treeMarkers.map(
+                                          (tree) => Marker(
+                                            point: tree.point,
+                                            width: 34,
+                                            height: 34,
+                                            child: Icon(
+                                              Icons.park,
+                                              color: healthColor(tree.health),
+                                              size: 24,
+                                            ),
+                                          ),
                                         ),
+                                        if (_userLocation != null)
+                                          Marker(
+                                            point: _userLocation!,
+                                            width: 34,
+                                            height: 34,
+                                            child: const Icon(
+                                              Icons.location_pin,
+                                              color: Colors.red,
+                                              size: 28,
+                                            ),
+                                          ),
                                       ],
                                     ),
-                                    if (!isOnline)
-                                      Container(
-                                        color: const Color(0xCCFFFFFF),
-                                        alignment: Alignment.center,
-                                        padding: const EdgeInsets.all(16),
-                                        child: const Text(
-                                          'Map tiles are unavailable while the device is offline.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF2E7D32),
-                                          ),
-                                        ),
-                                      ),
                                   ],
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              _loadingLocation
-                                  ? 'Getting your location...'
-                                  : _userLocation == null
-                                      ? 'Showing farm and tree markers.'
-                                      : 'Showing farm, tree, and current location markers.',
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontSize: 12,
-                              ),
-                            ),
-                            if (mapLatitude != null &&
-                                mapLongitude != null) ...[
-                              const SizedBox(height: 12),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _openDirections(
-                                    latitude: mapLatitude,
-                                    longitude: mapLongitude,
-                                  ),
-                                  icon: const Icon(Icons.route_outlined),
-                                  label: const Text('Open Directions'),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _SectionCard(
-                        title: 'Linked Farmer Tree Details',
-                        actionLabel: sortedTrees.isEmpty ? null : 'View all',
-                        onActionTap: sortedTrees.isEmpty
-                            ? null
-                            : () => _showTreeInventorySheet(farm, issues),
-                        child: sortedTrees.isEmpty
-                            ? Text(
-                                'No tree records were linked to this farm yet.',
-                                style: TextStyle(color: Colors.grey.shade700),
-                              )
-                            : Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      _TreeSummaryPill(
-                                        icon: Icons.favorite_outline,
-                                        label: '$healthyTreeCount healthy',
-                                        color: Colors.green.shade700,
-                                      ),
-                                      _TreeSummaryPill(
-                                        icon: Icons.timelapse_outlined,
-                                        label:
-                                            '$monitoringTreeCount monitoring',
-                                        color: Colors.orange.shade700,
-                                      ),
-                                      _TreeSummaryPill(
-                                        icon: Icons.warning_amber_rounded,
-                                        label: '$criticalTreeCount critical',
-                                        color: Colors.red.shade700,
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  ...sortedTrees.take(3).map((tree) {
-                                    final treeId = firstNonEmptyString(
-                                      [tree['treeId']],
-                                      fallback: 'Tree',
-                                    );
-                                    final treeDocId = (tree['_docId'] ?? '')
-                                        .toString()
-                                        .trim();
-                                    final issueCount = treeDocId.isEmpty
-                                        ? 0
-                                        : issues
-                                            .where(
-                                              (issue) =>
-                                                  issue.treeDocId == treeDocId,
-                                            )
-                                            .length;
-
-                                    return Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 10),
-                                      child: _TreePreviewTile(
-                                        treeId: treeId,
-                                        subtitle: firstNonEmptyString(
-                                          [
-                                            tree['species'],
-                                            tree['location'],
-                                          ],
-                                          fallback: 'Details unavailable',
-                                        ),
-                                        health: healthLabel(
-                                          tree['healthStatus'],
-                                        ),
-                                        issueCount: issueCount,
-                                        onTap: () =>
-                                            _showTreeDetailSheet(tree, issues),
-                                      ),
-                                    );
-                                  }),
-                                  if (sortedTrees.length > 3)
-                                    Text(
-                                      'Showing 3 of ${sortedTrees.length} trees. Tap View all to open the full list.',
+                                if (!isOnline)
+                                  Container(
+                                    color: const Color(0xCCFFFFFF),
+                                    alignment: Alignment.center,
+                                    padding: const EdgeInsets.all(16),
+                                    child: const Text(
+                                      'Map tiles are unavailable while the device is offline.',
+                                      textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        color: Colors.grey.shade700,
-                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF2E7D32),
                                       ),
                                     ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          _loadingLocation
+                              ? 'Getting your location...'
+                              : _userLocation == null
+                                  ? 'Showing farm and tree markers.'
+                                  : 'Showing farm, tree, and current location markers.',
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (mapLatitude != null && mapLongitude != null) ...[
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _openDirections(
+                                latitude: mapLatitude,
+                                longitude: mapLongitude,
+                              ),
+                              icon: const Icon(Icons.route_outlined),
+                              label: const Text('Open Directions'),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _SectionCard(
+                    title: 'Linked Farmer Tree Details',
+                    actionLabel: sortedTrees.isEmpty ? null : 'View all',
+                    onActionTap: sortedTrees.isEmpty
+                        ? null
+                        : () => _showTreeInventorySheet(farm, issues),
+                    child: sortedTrees.isEmpty
+                        ? Text(
+                            'No tree records were linked to this farm yet.',
+                            style: TextStyle(color: Colors.grey.shade700),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _TreeSummaryPill(
+                                    icon: Icons.favorite_outline,
+                                    label: '$healthyTreeCount healthy',
+                                    color: Colors.green.shade700,
+                                  ),
+                                  _TreeSummaryPill(
+                                    icon: Icons.timelapse_outlined,
+                                    label: '$monitoringTreeCount monitoring',
+                                    color: Colors.orange.shade700,
+                                  ),
+                                  _TreeSummaryPill(
+                                    icon: Icons.warning_amber_rounded,
+                                    label: '$criticalTreeCount critical',
+                                    color: Colors.red.shade700,
+                                  ),
                                 ],
                               ),
-                      ),
-                    ],
+                              const SizedBox(height: 12),
+                              ...sortedTrees.take(3).map((tree) {
+                                final treeId = firstNonEmptyString(
+                                  [tree['treeId']],
+                                  fallback: 'Tree',
+                                );
+                                final treeDocId =
+                                    (tree['_docId'] ?? '').toString().trim();
+                                final issueCount = treeDocId.isEmpty
+                                    ? 0
+                                    : issues
+                                        .where(
+                                          (issue) =>
+                                              issue.treeDocId == treeDocId,
+                                        )
+                                        .length;
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _TreePreviewTile(
+                                    treeId: treeId,
+                                    subtitle: firstNonEmptyString(
+                                      [
+                                        tree['species'],
+                                        tree['location'],
+                                      ],
+                                      fallback: 'Details unavailable',
+                                    ),
+                                    health: healthLabel(
+                                      tree['healthStatus'],
+                                    ),
+                                    issueCount: issueCount,
+                                    onTap: () =>
+                                        _showTreeDetailSheet(tree, issues),
+                                  ),
+                                );
+                              }),
+                              if (sortedTrees.length > 3)
+                                Text(
+                                  'Showing 3 of ${sortedTrees.length} trees. Tap View all to open the full list.',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
+                          ),
                   ),
-                ),
+                ],
               ),
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,13 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/firebase_providers.dart';
 import '../../features/farmer/tree_details/tree_controller.dart';
 import 'local_cache_service.dart';
 
 class OfflineSyncService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final LocalCacheService _cache = LocalCacheService();
+  OfflineSyncService({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+    LocalCacheService? cache,
+  })  : _auth = auth ?? FirebaseAuth.instance,
+        _firestore = firestore ?? FirebaseFirestore.instance,
+        _cache = cache ?? LocalCacheService();
+
+  final FirebaseAuth _auth;
+  final FirebaseFirestore _firestore;
+  final LocalCacheService _cache;
 
   bool _isSyncing = false;
 
@@ -150,3 +160,10 @@ class OfflineSyncService {
     }
   }
 }
+
+final offlineSyncServiceProvider = Provider<OfflineSyncService>((ref) {
+  return OfflineSyncService(
+    auth: ref.read(firebaseAuthProvider),
+    firestore: ref.read(firestoreProvider),
+  );
+});

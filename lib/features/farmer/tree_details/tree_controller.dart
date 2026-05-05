@@ -5,24 +5,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import '../../../core/providers/firebase_providers.dart';
 import '../../../core/services/local_cache_service.dart';
 import '../../../core/providers/connectivity_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
 
+export '../../../core/providers/firebase_providers.dart'
+    show firebaseAuthProvider, firebaseStorageProvider, firestoreProvider;
+
 const String treeDocIdField = '_docId';
-
-final firestoreProvider = Provider<FirebaseFirestore>((ref) {
-  return FirebaseFirestore.instance;
-});
-
-final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
-  return FirebaseAuth.instance;
-});
-
-final firebaseStorageProvider = Provider<FirebaseStorage>((ref) {
-  return FirebaseStorage.instance;
-});
 
 final treeIssueControllerProvider = Provider<TreeIssueController>((ref) {
   return TreeIssueController(

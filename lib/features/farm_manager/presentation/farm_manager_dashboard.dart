@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/router/route_paths.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'farm_manager_data.dart';
+import 'farm_manager_providers.dart';
 
 class FarmManagerDashboard extends ConsumerWidget {
   const FarmManagerDashboard({super.key});
@@ -37,280 +37,214 @@ class FarmManagerDashboard extends ConsumerWidget {
     final user = ref.watch(authStateProvider).user;
     final name =
         (user?.name.trim().isNotEmpty ?? false) ? user!.name.trim() : 'Manager';
+    final overviewAsync = ref.watch(farmManagerOverviewProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: SafeArea(
-        child: FutureBuilder<FarmManagerScope>(
-          future: loadFarmManagerScope(),
-          builder: (context, scopeSnapshot) {
-            if (scopeSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
+        child: overviewAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Unable to load dashboard data: $error',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+          data: (overview) {
+            final scopedTrees = overview.scopedTrees;
+            final farms = overview.farms;
+            final issues = overview.issues;
+            final healthyTrees = scopedTrees
+                .where((tree) => healthLabel(tree['healthStatus']) == 'Healthy')
+                .length;
+            final moderateTrees = scopedTrees
+                .where(
+                  (tree) =>
+                      healthLabel(tree['healthStatus']) == 'Needs Attention',
+                )
+                .length;
+            final criticalTrees = scopedTrees
+                .where(
+                  (tree) => {
+                    'At Risk',
+                    'Critical',
+                  }.contains(healthLabel(tree['healthStatus'])),
+                )
+                .length;
+            final criticalIssues =
+                issues.where((issue) => issue.severity == 'Critical').length;
+            final visibleAlerts = issues
+                .where((issue) => issue.severity != 'Resolved')
+                .take(3)
+                .toList(growable: false);
 
-            final scope = scopeSnapshot.data ??
-                const FarmManagerScope(
-                  managerUid: '',
-                  managerEmail: '',
-                  managerCode: '',
-                  linkedFarmerIds: <String>{},
-                  linkedFarmerEmails: <String>{},
-                );
-
-            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream:
-                  FirebaseFirestore.instance.collection('farms').snapshots(),
-              builder: (context, farmSnapshot) {
-                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance
-                      .collection('trees')
-                      .snapshots(),
-                  builder: (context, treeSnapshot) {
-                    if (treeSnapshot.connectionState ==
-                        ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    if (treeSnapshot.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'Unable to load dashboard data: ${treeSnapshot.error}',
-                            textAlign: TextAlign.center,
+            return Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                    children: [
+                      _WelcomeBanner(
+                        managerName: name,
+                        onBellTap: () {
+                          context.push(RoutePaths.activityLog);
+                        },
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _DashboardCountCard(
+                              title: 'Total Managed Farms',
+                              value: '${farms.length}',
+                              onTap: () {
+                                context.push(
+                                  RoutePaths.farmManagerFarms,
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      );
-                    }
-
-                    final farmDocs = farmSnapshot.data?.docs ??
-                        <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                    final treeDocs = treeSnapshot.data?.docs ??
-                        <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                    final scopedTrees = buildScopedTrees(treeDocs, scope);
-                    final farms = buildFarmSummaries(
-                      farmDocs: farmDocs,
-                      scopedTrees: scopedTrees,
-                      scope: scope,
-                    );
-
-                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseFirestore.instance
-                          .collectionGroup('issues')
-                          .snapshots(),
-                      builder: (context, issueSnapshot) {
-                        final issueDocs = issueSnapshot.data?.docs ??
-                            <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                        final issues = buildIssueSummaries(
-                          issueDocs: issueDocs,
-                          scopedTrees: scopedTrees,
-                          scope: scope,
-                        );
-
-                        final healthyTrees = scopedTrees
-                            .where(
-                              (tree) =>
-                                  healthLabel(tree['healthStatus']) ==
-                                  'Healthy',
-                            )
-                            .length;
-                        final moderateTrees = scopedTrees
-                            .where(
-                              (tree) =>
-                                  healthLabel(tree['healthStatus']) ==
-                                  'Needs Attention',
-                            )
-                            .length;
-                        final criticalTrees = scopedTrees
-                            .where(
-                              (tree) => {
-                                'At Risk',
-                                'Critical',
-                              }.contains(healthLabel(tree['healthStatus'])),
-                            )
-                            .length;
-                        final criticalIssues = issues
-                            .where((issue) => issue.severity == 'Critical')
-                            .length;
-                        final visibleAlerts = issues
-                            .where((issue) => issue.severity != 'Resolved')
-                            .take(3)
-                            .toList(growable: false);
-
-                        return Column(
-                          children: [
-                            Expanded(
-                              child: ListView(
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                                children: [
-                                  _WelcomeBanner(
-                                    managerName: name,
-                                    onBellTap: () {
-                                      context.push(RoutePaths.activityLog);
-                                    },
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _DashboardCountCard(
+                              title: 'Total Trees',
+                              value: '${scopedTrees.length}',
+                              onTap: () {
+                                context.push(
+                                  RoutePaths.farmManagerTrees,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      _HealthSummaryCard(
+                        healthyTrees: healthyTrees,
+                        moderateTrees: moderateTrees,
+                        criticalTrees: criticalTrees,
+                        totalTrees: scopedTrees.length,
+                        onTap: () {
+                          context.push(
+                            RoutePaths.farmManagerAnalytics,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 18),
+                      _IssueTrackerBanner(
+                        onTap: () {
+                          context.push(
+                            RoutePaths.farmManagerIssues,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _DashboardCountCard(
+                              title: 'Total Issues',
+                              value: '${issues.length}',
+                              onTap: () {
+                                context.push(
+                                  RoutePaths.farmManagerIssues,
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _DashboardCountCard(
+                              title: 'Critical',
+                              value: '$criticalIssues',
+                              onTap: () {
+                                context.push(
+                                  _issueTrackerLocation(
+                                    severity: 'Critical',
                                   ),
-                                  const SizedBox(height: 18),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _DashboardCountCard(
-                                          title: 'Total Managed Farms',
-                                          value: '${farms.length}',
-                                          onTap: () {
-                                            context.push(
-                                              RoutePaths.farmManagerFarms,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: _DashboardCountCard(
-                                          title: 'Total Trees',
-                                          value: '${scopedTrees.length}',
-                                          onTap: () {
-                                            context.push(
-                                              RoutePaths.farmManagerTrees,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 18),
-                                  _HealthSummaryCard(
-                                    healthyTrees: healthyTrees,
-                                    moderateTrees: moderateTrees,
-                                    criticalTrees: criticalTrees,
-                                    totalTrees: scopedTrees.length,
-                                    onTap: () {
-                                      context.push(
-                                        RoutePaths.farmManagerAnalytics,
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(height: 18),
-                                  _IssueTrackerBanner(
-                                    onTap: () {
-                                      context.push(
-                                        RoutePaths.farmManagerIssues,
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(height: 18),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _DashboardCountCard(
-                                          title: 'Total Issues',
-                                          value: '${issues.length}',
-                                          onTap: () {
-                                            context.push(
-                                              RoutePaths.farmManagerIssues,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: _DashboardCountCard(
-                                          title: 'Critical',
-                                          value: '$criticalIssues',
-                                          onTap: () {
-                                            context.push(
-                                              _issueTrackerLocation(
-                                                severity: 'Critical',
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 18),
-                                  Row(
-                                    children: [
-                                      const Expanded(
-                                        child: Text(
-                                          'Global Alerts Feed',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ),
-                                      Text(
-                                        'Recently',
-                                        style: TextStyle(
-                                          color: Colors.grey.shade800,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  if (visibleAlerts.isEmpty)
-                                    const _AlertTile(
-                                      title: 'No Active Alerts',
-                                      message:
-                                          'Everything looks stable across managed farms.',
-                                      backgroundColor: Color(0xFFE6F4EA),
-                                      iconColor: Color(0xFF4CAF50),
-                                    )
-                                  else
-                                    ...visibleAlerts.map(
-                                      (issue) => Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 12),
-                                        child: _AlertTile(
-                                          title: '${issue.severity} Alert',
-                                          message: issue.note.isEmpty
-                                              ? 'No message'
-                                              : issue.note,
-                                          backgroundColor:
-                                              _alertBackground(issue.severity),
-                                          iconColor: issueSeverityColor(
-                                              issue.severity),
-                                          onTap: () {
-                                            context.push(
-                                              _issueTrackerLocation(
-                                                farmId: issue.farmId,
-                                                farmLabel: issue.farmLabel,
-                                                severity: issue.severity,
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                ],
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Global Alerts Feed',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                            _DashboardBottomNav(
-                              onHomeTap: () {
-                                context.go(RoutePaths.farmManagerHome);
-                              },
-                              onFarmsTap: () {
-                                context.push(RoutePaths.farmManagerFarms);
-                              },
-                              onScanTap: () {
-                                context.push('/scan');
-                              },
-                              onAnalyticsTap: () {
-                                context.push(RoutePaths.farmManagerAnalytics);
-                              },
-                              onProfileTap: () {
-                                context.push('/profile');
+                          ),
+                          Text(
+                            'Recently',
+                            style: TextStyle(
+                              color: Colors.grey.shade800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (visibleAlerts.isEmpty)
+                        const _AlertTile(
+                          title: 'No Active Alerts',
+                          message:
+                              'Everything looks stable across managed farms.',
+                          backgroundColor: Color(0xFFE6F4EA),
+                          iconColor: Color(0xFF4CAF50),
+                        )
+                      else
+                        ...visibleAlerts.map(
+                          (issue) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _AlertTile(
+                              title: '${issue.severity} Alert',
+                              message: issue.note.isEmpty
+                                  ? 'No message'
+                                  : issue.note,
+                              backgroundColor: _alertBackground(issue.severity),
+                              iconColor: issueSeverityColor(issue.severity),
+                              onTap: () {
+                                context.push(
+                                  _issueTrackerLocation(
+                                    farmId: issue.farmId,
+                                    farmLabel: issue.farmLabel,
+                                    severity: issue.severity,
+                                  ),
+                                );
                               },
                             ),
-                          ],
-                        );
-                      },
-                    );
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                _DashboardBottomNav(
+                  onHomeTap: () {
+                    context.go(RoutePaths.farmManagerHome);
                   },
-                );
-              },
+                  onFarmsTap: () {
+                    context.push(RoutePaths.farmManagerFarms);
+                  },
+                  onScanTap: () {
+                    context.push('/scan');
+                  },
+                  onAnalyticsTap: () {
+                    context.push(RoutePaths.farmManagerAnalytics);
+                  },
+                  onProfileTap: () {
+                    context.push('/profile');
+                  },
+                ),
+              ],
             );
           },
         ),

@@ -19,8 +19,14 @@ class PhoneVerificationResult {
 }
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  AuthService({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+  })  : _auth = auth ?? FirebaseAuth.instance,
+        firestore = firestore ?? FirebaseFirestore.instance;
+
+  final FirebaseAuth _auth;
+  final FirebaseFirestore firestore;
 
   String _normalizedRole(String role) {
     return role.trim().toLowerCase();

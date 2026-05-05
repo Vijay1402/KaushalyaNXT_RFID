@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -14,20 +14,21 @@ import 'package:csv/csv.dart';
 import '../compare/models/compare_model.dart' as compare;
 import '../compare/presentation/select_trees_screen.dart';
 import '../farm_manager_data.dart';
+import '../farm_manager_providers.dart';
 
-class ManagedTreeListScreen extends StatefulWidget {
+class ManagedTreeListScreen extends ConsumerStatefulWidget {
   const ManagedTreeListScreen({super.key});
 
   @override
-  State<ManagedTreeListScreen> createState() => _ManagedTreeListScreenState();
+  ConsumerState<ManagedTreeListScreen> createState() =>
+      _ManagedTreeListScreenState();
 }
 
-class _ManagedTreeListScreenState extends State<ManagedTreeListScreen> {
+class _ManagedTreeListScreenState extends ConsumerState<ManagedTreeListScreen> {
   static const MethodChannel _fileSaveChannel = MethodChannel(
     'com.example.kaushalyanxt_rfid/files',
   );
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedTrees = <String>{};
   List<Map<String, dynamic>> _currentScopedTrees =
@@ -346,23 +347,17 @@ class _ManagedTreeListScreenState extends State<ManagedTreeListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<FarmManagerScope>(
-      future: loadFarmManagerScope(),
-      builder: (context, scopeSnapshot) {
-        if (scopeSnapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+    final overviewAsync = ref.watch(farmManagerOverviewProvider);
 
-        final scope = scopeSnapshot.data ??
-            const FarmManagerScope(
-              managerUid: '',
-              managerEmail: '',
-              managerCode: '',
-              linkedFarmerIds: <String>{},
-              linkedFarmerEmails: <String>{},
-            );
+    return overviewAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, _) => Scaffold(
+        body: Center(child: Text('Error: $error')),
+      ),
+      data: (overview) {
+        final scopedTrees = overview.scopedTrees;
 
         return Scaffold(
           backgroundColor: Colors.grey[200],
@@ -460,23 +455,8 @@ class _ManagedTreeListScreenState extends State<ManagedTreeListScreen> {
               ),
               const SizedBox(height: 10),
               Expanded(
-                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: _firestore.collection('trees').snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      _currentScopedTrees = const <Map<String, dynamic>>[];
-                      _currentVisibleTrees = const <Map<String, dynamic>>[];
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      _currentScopedTrees = const <Map<String, dynamic>>[];
-                      _currentVisibleTrees = const <Map<String, dynamic>>[];
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    }
-
-                    final treeDocs = snapshot.data?.docs ??
-                        <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                    final scopedTrees = buildScopedTrees(treeDocs, scope);
+                child: Builder(
+                  builder: (context) {
                     _currentScopedTrees = scopedTrees;
                     final visibleTrees = scopedTrees.where((tree) {
                       if (_search.isEmpty) {
