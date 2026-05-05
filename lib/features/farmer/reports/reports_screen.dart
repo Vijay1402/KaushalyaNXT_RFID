@@ -65,15 +65,20 @@ class _ReportsScreenState extends State<ReportsScreen>
       if (_selectedHealth != null) {
         switch (_selectedHealth) {
           case 'Healthy':
-            if (t.currentStatus != TreeHealthStatus.healthy) return false;
+            if (t.currentStatus != TreeHealthStatus.healthy) {
+              return false;
+            }
             break;
           case 'Unhealthy':
             if (t.currentStatus != TreeHealthStatus.atRisk &&
-                t.currentStatus != TreeHealthStatus.sick) return false;
+                t.currentStatus != TreeHealthStatus.sick) {
+              return false;
+            }
             break;
           case 'Recovering':
-            if (t.currentStatus != TreeHealthStatus.needsAttention)
+            if (t.currentStatus != TreeHealthStatus.needsAttention) {
               return false;
+            }
             break;
         }
       }

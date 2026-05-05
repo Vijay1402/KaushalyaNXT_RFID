@@ -27,10 +27,10 @@ class TreeDetailScreen extends StatefulWidget {
 
 class _TreeDetailScreenState extends State<TreeDetailScreen> {
   // ── Colours ───────────────────────────────────────────────────────────────
-  static const _dark    = Color(0xFF1A2E1C);
-  static const _green1  = Color(0xFF1E4D2B);
-  static const _green2  = Color(0xFF2D6A3F);
-  static const _tagBg   = Color(0xFFF5F9EC);
+  static const _dark = Color(0xFF1A2E1C);
+  static const _green1 = Color(0xFF1E4D2B);
+  static const _green2 = Color(0xFF2D6A3F);
+  static const _tagBg = Color(0xFFF5F9EC);
   static const _cloudBg = Color(0xFFEBF4FF);
 
   // ── Connectivity state ────────────────────────────────────────────────────
@@ -93,11 +93,11 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
                     // ── Handle ────────────────────────────────────
                     Center(
                       child: Container(
-                        width: 40, height: 4,
+                        width: 40,
+                        height: 4,
                         decoration: BoxDecoration(
                           color: Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(2),
@@ -156,7 +156,8 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                             ),
                           ),
                           Positioned(
-                            top: 8, right: 8,
+                            top: 8,
+                            right: 8,
                             child: GestureDetector(
                               onTap: () => setSheet(() => pickedImage = null),
                               child: Container(
@@ -180,7 +181,7 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                         label: const Text('Change Photo'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: _green2,
-                          side: BorderSide(color: _green2),
+                          side: const BorderSide(color: _green2),
                           minimumSize: const Size(double.infinity, 44),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10)),
@@ -241,7 +242,8 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: _green2, width: 1.5),
+                          borderSide:
+                              const BorderSide(color: _green2, width: 1.5),
                         ),
                         contentPadding: const EdgeInsets.all(12),
                       ),
@@ -257,9 +259,12 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Row(children: const [
-                                Icon(Icons.check_circle,
-                                    color: Colors.white, size: 18),
+                              content: const Row(children: [
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
                                 SizedBox(width: 8),
                                 Text('Issue reported successfully!'),
                               ]),
@@ -396,7 +401,8 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 6, height: 6,
+                  width: 6,
+                  height: 6,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: _isOnline ? Colors.greenAccent : Colors.redAccent,
@@ -418,7 +424,9 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
         ],
       ),
 
-      actions: [IconButton(icon: const Icon(Icons.more_vert), onPressed: () {})],
+      actions: [
+        IconButton(icon: const Icon(Icons.more_vert), onPressed: () {})
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
@@ -427,7 +435,11 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.green.shade900, Colors.green.shade600, Colors.green.shade400],
+                  colors: [
+                    Colors.green.shade900,
+                    Colors.green.shade600,
+                    Colors.green.shade400
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -436,14 +448,19 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
             ),
             // Bottom fade
             Positioned(
-              bottom: 0, left: 0, right: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
               child: Container(
                 height: 80,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
-                    colors: [Colors.black.withValues(alpha: 0.5), Colors.transparent],
+                    colors: [
+                      Colors.black.withValues(alpha: 0.5),
+                      Colors.transparent
+                    ],
                   ),
                 ),
               ),
@@ -451,9 +468,11 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
 
             // ── Age badge (top left) ──────────────────────────
             Positioned(
-              top: 80, left: 16,
+              top: 80,
+              left: 16,
               child: Container(
-                width: 64, height: 64,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
@@ -461,16 +480,27 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  boxShadow: [BoxShadow(color: Colors.amber.withValues(alpha: 0.4), blurRadius: 10)],
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.amber.withValues(alpha: 0.4),
+                        blurRadius: 10)
+                  ],
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Icon(Icons.park, color: Colors.white, size: 12),
                     Text('${widget.tree.ageInYears}',
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900)),
                     const Text('YRS OLD',
-                        style: TextStyle(color: Colors.white, fontSize: 6, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 6,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5)),
                   ],
                 ),
               ),
@@ -478,21 +508,32 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
 
             // ── Health badge (top right) ──────────────────────
             Positioned(
-              top: 90, right: 16,
+              top: 90,
+              right: 16,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: _getStatusColor(widget.tree.currentStatus),
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: _getStatusColor(widget.tree.currentStatus).withValues(alpha: 0.4), blurRadius: 8)],
+                  boxShadow: [
+                    BoxShadow(
+                        color: _getStatusColor(widget.tree.currentStatus)
+                            .withValues(alpha: 0.4),
+                        blurRadius: 8)
+                  ],
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.check_circle, color: Colors.white, size: 14),
+                    const Icon(Icons.check_circle,
+                        color: Colors.white, size: 14),
                     const SizedBox(width: 4),
                     Text(_statusLabel(widget.tree.currentStatus),
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13)),
                   ],
                 ),
               ),
@@ -502,11 +543,13 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
             // Shows only when online, sits below health badge on right
             if (_isOnline)
               Positioned(
-                top: 134, right: 16,
+                top: 134,
+                right: 16,
                 child: GestureDetector(
                   onTap: _showReportIssue,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.red.shade600,
                       borderRadius: BorderRadius.circular(20),
@@ -537,15 +580,25 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
 
             // ── Tree name (bottom left) ───────────────────────
             Positioned(
-              bottom: 14, left: 16, right: 16,
+              bottom: 14,
+              left: 16,
+              right: 16,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(widget.tree.name,
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800,
-                          shadows: [Shadow(color: Colors.black45, blurRadius: 6)])),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          shadows: [
+                            Shadow(color: Colors.black45, blurRadius: 6)
+                          ])),
                   Text(widget.tree.species,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13, fontStyle: FontStyle.italic)),
+                      style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontStyle: FontStyle.italic)),
                 ],
               ),
             ),
@@ -558,15 +611,25 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
   // ── From Tag | From Cloud Panel ───────────────────────────────────────────
   Widget _buildTagCloudPanel(BuildContext context) {
     final lastInspection = widget.tree.healthHistory.isNotEmpty
-        ? widget.tree.healthHistory.last.date : widget.tree.lastInspectionDate;
+        ? widget.tree.healthHistory.last.date
+        : widget.tree.lastInspectionDate;
     final daysSince = DateTime.now().difference(lastInspection).inDays;
-    final lastScanStr = daysSince == 0 ? 'Today' : daysSince == 1 ? 'Yesterday' : '$daysSince days ago';
+    final lastScanStr = daysSince == 0
+        ? 'Today'
+        : daysSince == 1
+            ? 'Yesterday'
+            : '$daysSince days ago';
     final yieldKg = widget.tree.maintenanceRecords.length * 48 + 50;
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3))
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -580,15 +643,20 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(children: [
+                    const Row(children: [
                       Icon(Icons.sensors, color: _green2, size: 16),
-                      const SizedBox(width: 6),
-                      Text('From Tag', style: TextStyle(color: _green2, fontWeight: FontWeight.w700, fontSize: 13)),
+                      SizedBox(width: 6),
+                      Text('From Tag',
+                          style: TextStyle(
+                              color: _green2,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13)),
                     ]),
                     const SizedBox(height: 10),
                     _tagRow('🌳', 'Tree ID', widget.tree.id),
                     _tagRow('👤', 'Farmer', 'R. Kumar'),
-                    _tagRow('💚', 'Health', _statusLabel(widget.tree.currentStatus)),
+                    _tagRow('💚', 'Health',
+                        _statusLabel(widget.tree.currentStatus)),
                     _tagRow('🏆', 'Yield', '$yieldKg kg/yr'),
                     _tagRow('📅', 'Age', '${widget.tree.ageInYears} yrs'),
                     _tagRow('🔍', 'Last Scan', lastScanStr),
@@ -609,7 +677,10 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                       Icon(Icons.cloud, color: Colors.blue.shade600, size: 16),
                       const SizedBox(width: 6),
                       Text('From Cloud',
-                          style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.w700, fontSize: 13)),
+                          style: TextStyle(
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13)),
                     ]),
                     const SizedBox(height: 10),
                   ],
@@ -633,7 +704,9 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
             text: TextSpan(
               style: const TextStyle(fontSize: 11, color: Colors.black87),
               children: [
-                TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
+                TextSpan(
+                    text: '$label: ',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 TextSpan(text: value),
               ],
             ),
@@ -643,7 +716,9 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
     );
   }
 
-  Widget _cloudRow(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {
+  // ignore: unused_element
+  Widget _cloudRow(BuildContext context, IconData icon, String label,
+      Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Padding(
@@ -652,7 +727,11 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
           Icon(icon, color: color, size: 15),
           const SizedBox(width: 6),
           Text(label,
-              style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500, decoration: TextDecoration.underline)),
+              style: TextStyle(
+                  fontSize: 12,
+                  color: color,
+                  fontWeight: FontWeight.w500,
+                  decoration: TextDecoration.underline)),
           const Spacer(),
           Icon(Icons.arrow_forward_ios, size: 10, color: color),
         ]),
@@ -663,9 +742,9 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
   // ── RFID Status Panel ─────────────────────────────────────────────────────
   Widget _buildRFIDStatusPanel() {
     final now = DateTime.now();
-    final h   = now.hour % 12 == 0 ? 12 : now.hour % 12;
-    final m   = now.minute.toString().padLeft(2, '0');
-    final ampm= now.hour >= 12 ? 'PM' : 'AM';
+    final h = now.hour % 12 == 0 ? 12 : now.hour % 12;
+    final m = now.minute.toString().padLeft(2, '0');
+    final ampm = now.hour >= 12 ? 'PM' : 'AM';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -673,7 +752,12 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
         color: const Color(0xFFFFFBE6),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.amber.shade200),
-        boxShadow: [BoxShadow(color: Colors.amber.withValues(alpha: 0.15), blurRadius: 10, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.amber.withValues(alpha: 0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 3))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -682,21 +766,35 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
             Icon(Icons.nfc_rounded, color: Colors.amber.shade700, size: 18),
             const SizedBox(width: 6),
             Text('RFID Tag Status Panel',
-                style: TextStyle(color: Colors.amber.shade800, fontWeight: FontWeight.w700, fontSize: 13)),
+                style: TextStyle(
+                    color: Colors.amber.shade800,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13)),
           ]),
           const SizedBox(height: 10),
           Text('Tag EPC: ${widget.tree.rfidTag}',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _dark, letterSpacing: 0.5)),
+              style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: _dark,
+                  letterSpacing: 0.5)),
           const SizedBox(height: 8),
           Text('Tag TID: ${widget.tree.rfidTid}',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _dark, letterSpacing: 0.2)),
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _dark,
+                  letterSpacing: 0.2)),
           const SizedBox(height: 8),
-          Row(children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 16),
-            const SizedBox(width: 6),
-            const Text('Status: ', style: TextStyle(fontSize: 13)),
-            const Text('Active (In Range)',
-                style: TextStyle(fontSize: 13, color: Colors.green, fontWeight: FontWeight.w600)),
+          const Row(children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 16),
+            SizedBox(width: 6),
+            Text('Status: ', style: TextStyle(fontSize: 13)),
+            Text('Active (In Range)',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.green,
+                    fontWeight: FontWeight.w600)),
           ]),
           const SizedBox(height: 5),
           _rfidRow('Last Scan Time', 'Today, $h:$m $ampm'),
@@ -714,7 +812,9 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
         text: TextSpan(
           style: const TextStyle(fontSize: 13, color: Colors.black87),
           children: [
-            TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.w500)),
+            TextSpan(
+                text: '$label: ',
+                style: const TextStyle(fontWeight: FontWeight.w500)),
             TextSpan(text: value),
           ],
         ),
@@ -726,15 +826,19 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
   Widget _buildTreeProfileCard() {
     final fmt = DateFormat('MMM d, yyyy');
     return _infoCard(
-      title: 'Tree Profile', icon: Icons.park, iconColor: _green2,
+      title: 'Tree Profile',
+      icon: Icons.park,
+      iconColor: _green2,
       children: [
         _profileRow('Farmer', 'Rajesh Kumar'),
-        _profileRow('Location', 'Plot ${widget.tree.plotNumber}, Karnataka, India'),
+        _profileRow(
+            'Location', 'Plot ${widget.tree.plotNumber}, Karnataka, India'),
         _profileRow('Coordinates',
             '${widget.tree.latitude.toStringAsFixed(4)}° N, ${widget.tree.longitude.toStringAsFixed(4)}° E'),
         _profileRow('Species', widget.tree.species),
         _profileRow('Planted On', fmt.format(widget.tree.plantingDate)),
-        _profileRow('Expected Next Yield', '${widget.tree.maintenanceRecords.length * 48 + 100} kg'),
+        _profileRow('Expected Next Yield',
+            '${widget.tree.maintenanceRecords.length * 48 + 100} kg'),
       ],
     );
   }
@@ -742,22 +846,33 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
   // ── Inspection & Care Card ────────────────────────────────────────────────
   Widget _buildInspectionCard() {
     final fmt = DateFormat('MMM d, yyyy');
-    final lastRecord  = widget.tree.healthHistory.isNotEmpty ? widget.tree.healthHistory.last : null;
-    final lastMainten = widget.tree.maintenanceRecords.isNotEmpty ? widget.tree.maintenanceRecords.last : null;
+    final lastRecord = widget.tree.healthHistory.isNotEmpty
+        ? widget.tree.healthHistory.last
+        : null;
+    final lastMainten = widget.tree.maintenanceRecords.isNotEmpty
+        ? widget.tree.maintenanceRecords.last
+        : null;
 
     return _infoCard(
-      title: 'Inspection & Care', icon: Icons.medical_services_outlined, iconColor: Colors.teal,
+      title: 'Inspection & Care',
+      icon: Icons.medical_services_outlined,
+      iconColor: Colors.teal,
       children: [
-        _profileRow('Last Inspection',
+        _profileRow(
+            'Last Inspection',
             lastRecord != null
                 ? '${fmt.format(lastRecord.date)} by ${lastRecord.recordedBy}'
                 : fmt.format(widget.tree.lastInspectionDate)),
         if (lastRecord != null) _profileRow('Notes', lastRecord.note),
         if (lastMainten != null) ...[
-          _profileRow('Last Maintenance', '${lastMainten.type} — ${fmt.format(lastMainten.date)}'),
+          _profileRow('Last Maintenance',
+              '${lastMainten.type} — ${fmt.format(lastMainten.date)}'),
           _profileRow('Technician', lastMainten.technician),
         ],
-        _profileRow('Next Due', fmt.format(widget.tree.lastInspectionDate.add(const Duration(days: 30)))),
+        _profileRow(
+            'Next Due',
+            fmt.format(
+                widget.tree.lastInspectionDate.add(const Duration(days: 30)))),
       ],
     );
   }
@@ -765,16 +880,25 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
   // ── Growth Stats Card ─────────────────────────────────────────────────────
   Widget _buildGrowthStatsCard() {
     return _infoCard(
-      title: 'Growth Statistics', icon: Icons.trending_up, iconColor: Colors.blue.shade700,
+      title: 'Growth Statistics',
+      icon: Icons.trending_up,
+      iconColor: Colors.blue.shade700,
       children: [
         Row(children: [
-          Expanded(child: _statBox('Age', '${widget.tree.ageInYears} yrs', Icons.calendar_today, _green2)),
+          Expanded(
+              child: _statBox('Age', '${widget.tree.ageInYears} yrs',
+                  Icons.calendar_today, _green2)),
           const SizedBox(width: 10),
-          Expanded(child: _statBox('Health', _statusLabel(widget.tree.currentStatus),
-              Icons.favorite, _getStatusColor(widget.tree.currentStatus))),
+          Expanded(
+              child: _statBox('Health', _statusLabel(widget.tree.currentStatus),
+                  Icons.favorite, _getStatusColor(widget.tree.currentStatus))),
           const SizedBox(width: 10),
-          Expanded(child: _statBox('Scans', '${widget.tree.maintenanceRecords.length}',
-              Icons.qr_code_scanner, Colors.orange)),
+          Expanded(
+              child: _statBox(
+                  'Scans',
+                  '${widget.tree.maintenanceRecords.length}',
+                  Icons.qr_code_scanner,
+                  Colors.orange)),
         ]),
       ],
     );
@@ -791,7 +915,9 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
       child: Column(children: [
         Icon(icon, color: color, size: 20),
         const SizedBox(height: 5),
-        Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 13)),
+        Text(value,
+            style: TextStyle(
+                color: color, fontWeight: FontWeight.w800, fontSize: 13)),
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10)),
       ]),
     );
@@ -800,18 +926,25 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
   // ── GPS Card ──────────────────────────────────────────────────────────────
   Widget _buildGPSCard() {
     return _infoCard(
-      title: 'Location', icon: Icons.location_on, iconColor: Colors.red,
+      title: 'Location',
+      icon: Icons.location_on,
+      iconColor: Colors.red,
       children: [
-        _profileRow('Latitude', '${widget.tree.latitude.toStringAsFixed(6)}° N'),
-        _profileRow('Longitude', '${widget.tree.longitude.toStringAsFixed(6)}° E'),
+        _profileRow(
+            'Latitude', '${widget.tree.latitude.toStringAsFixed(6)}° N'),
+        _profileRow(
+            'Longitude', '${widget.tree.longitude.toStringAsFixed(6)}° E'),
         _profileRow('Plot', widget.tree.plotNumber),
         const SizedBox(height: 4),
-        Row(children: [
+        const Row(children: [
           Icon(Icons.map_outlined, color: _green2, size: 15),
-          const SizedBox(width: 6),
+          SizedBox(width: 6),
           Text('View on Map',
-              style: TextStyle(color: _green2, fontSize: 13,
-                  fontWeight: FontWeight.w500, decoration: TextDecoration.underline)),
+              style: TextStyle(
+                  color: _green2,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  decoration: TextDecoration.underline)),
         ]),
       ],
     );
@@ -820,11 +953,16 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
   // ── Notes Card ────────────────────────────────────────────────────────────
   Widget _buildNotesCard() {
     return _infoCard(
-      title: 'Worker Notes', icon: Icons.notes, iconColor: Colors.grey.shade700,
+      title: 'Worker Notes',
+      icon: Icons.notes,
+      iconColor: Colors.grey.shade700,
       children: [
         Text(
-          widget.tree.notes.isNotEmpty ? widget.tree.notes : 'No notes available for this tree.',
-          style: TextStyle(color: Colors.grey.shade700, fontSize: 13, height: 1.5),
+          widget.tree.notes.isNotEmpty
+              ? widget.tree.notes
+              : 'No notes available for this tree.',
+          style:
+              TextStyle(color: Colors.grey.shade700, fontSize: 13, height: 1.5),
         ),
       ],
     );
@@ -836,7 +974,12 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, -4))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, -4))
+        ],
       ),
       child: Row(children: [
         Expanded(
@@ -846,24 +989,26 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
             label: const Text('Schedule'),
             style: OutlinedButton.styleFrom(
               foregroundColor: _green2,
-              side: BorderSide(color: _green2),
+              side: const BorderSide(color: _green2),
               padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => const RFIDScanScreen())),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const RFIDScanScreen())),
             icon: const Icon(Icons.sensors, size: 18),
             label: const Text('Scan Tag'),
             style: ElevatedButton.styleFrom(
               backgroundColor: _green1,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ),
@@ -872,15 +1017,23 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
   }
 
   // ── Reusable helpers ──────────────────────────────────────────────────────
-  Widget _infoCard({required String title, required IconData icon,
-      required Color iconColor, required List<Widget> children}) {
+  Widget _infoCard(
+      {required String title,
+      required IconData icon,
+      required Color iconColor,
+      required List<Widget> children}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 2))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -888,7 +1041,9 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
           Row(children: [
             Icon(icon, color: iconColor, size: 18),
             const SizedBox(width: 7),
-            Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _dark)),
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700, color: _dark)),
           ]),
           const SizedBox(height: 12),
           ...children,
@@ -902,9 +1057,12 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
       padding: const EdgeInsets.only(bottom: 7),
       child: RichText(
         text: TextSpan(
-          style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+          style:
+              const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
           children: [
-            TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.w700)),
+            TextSpan(
+                text: '$label: ',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
             TextSpan(text: value),
           ],
         ),
@@ -914,19 +1072,27 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
 
   Color _getStatusColor(TreeHealthStatus status) {
     switch (status) {
-      case TreeHealthStatus.healthy:        return Colors.green;
-      case TreeHealthStatus.atRisk:         return Colors.orange;
-      case TreeHealthStatus.sick:           return Colors.red;
-      case TreeHealthStatus.needsAttention: return Colors.blue;
+      case TreeHealthStatus.healthy:
+        return Colors.green;
+      case TreeHealthStatus.atRisk:
+        return Colors.orange;
+      case TreeHealthStatus.sick:
+        return Colors.red;
+      case TreeHealthStatus.needsAttention:
+        return Colors.blue;
     }
   }
 
   String _statusLabel(TreeHealthStatus status) {
     switch (status) {
-      case TreeHealthStatus.healthy:        return 'Healthy';
-      case TreeHealthStatus.atRisk:         return 'At Risk';
-      case TreeHealthStatus.sick:           return 'Sick';
-      case TreeHealthStatus.needsAttention: return 'Needs Attention';
+      case TreeHealthStatus.healthy:
+        return 'Healthy';
+      case TreeHealthStatus.atRisk:
+        return 'At Risk';
+      case TreeHealthStatus.sick:
+        return 'Sick';
+      case TreeHealthStatus.needsAttention:
+        return 'Needs Attention';
     }
   }
 }

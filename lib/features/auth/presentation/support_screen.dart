@@ -114,8 +114,8 @@ class _SupportScreenState extends State<SupportScreen> {
             const SizedBox(height: 20),
 
             /// EMAIL
-            Row(
-              children: const [
+            const Row(
+              children: [
                 Icon(Icons.email, color: Colors.black54),
                 SizedBox(width: 12),
                 Column(
@@ -138,8 +138,8 @@ class _SupportScreenState extends State<SupportScreen> {
             const SizedBox(height: 20),
 
             /// PHONE
-            Row(
-              children: const [
+            const Row(
+              children: [
                 Icon(Icons.phone, color: Colors.black54),
                 SizedBox(width: 12),
                 Column(

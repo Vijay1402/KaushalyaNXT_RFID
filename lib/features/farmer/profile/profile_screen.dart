@@ -220,7 +220,7 @@ class ProfileScreen extends ConsumerWidget {
       title: "Personal Information",
       children: [
         _InfoRow(icon: Icons.phone, label: "Phone", value: userPhone),
-        _InfoRow(
+        const _InfoRow(
             icon: Icons.location_on,
             label: "Location",
             value: "Karnataka, India"),
@@ -573,7 +573,8 @@ class ProfileScreen extends ConsumerWidget {
         .split(RegExp(r'[_\s]+'))
         .where((part) => part.isNotEmpty)
         .map(
-          (part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+          (part) =>
+              '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
         )
         .join(' ');
   }

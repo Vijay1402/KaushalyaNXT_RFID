@@ -41,9 +41,7 @@ class _NotificationSettingsScreenState
                 });
               },
             ),
-
             const SizedBox(height: 20),
-
             _buildSwitchTile(
               title: "Tree Alerts",
               value: treeAlerts,
@@ -53,9 +51,7 @@ class _NotificationSettingsScreenState
                 });
               },
             ),
-
             const SizedBox(height: 20),
-
             _buildSwitchTile(
               title: "App Updates",
               value: appUpdates,
@@ -92,7 +88,7 @@ class _NotificationSettingsScreenState
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: Colors.white,
+          activeThumbColor: Colors.white,
           activeTrackColor: Colors.deepPurple,
           inactiveThumbColor: Colors.grey,
           inactiveTrackColor: Colors.grey.shade400,

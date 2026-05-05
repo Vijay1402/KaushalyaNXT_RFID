@@ -21,6 +21,7 @@ class TreePhotosScreen extends ConsumerWidget {
   static const _green1 = Color(0xFF1E4D2B);
 
   // Mock photo entries — replace with real URLs from your backend later
+  // ignore: unused_field
   static const List<Map<String, String>> _mockPhotos = [
     {
       'label': 'Full Tree View',

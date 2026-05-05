@@ -8,18 +8,61 @@ class TreeWeatherScreen extends StatelessWidget {
   final Tree tree;
   const TreeWeatherScreen({super.key, required this.tree});
 
+  // ignore: unused_field
   static const _green1 = Color(0xFF1E4D2B);
-  static const _blue   = Color(0xFF1565C0);
+  static const _blue = Color(0xFF1565C0);
 
   // Mock weekly weather data — replace with real API later
   static const List<Map<String, dynamic>> _weeklyWeather = [
-    {'day': 'Mon', 'icon': Icons.wb_sunny,        'temp': '32°C', 'rain': '0 mm',  'humidity': '55%'},
-    {'day': 'Tue', 'icon': Icons.cloud,            'temp': '28°C', 'rain': '2 mm',  'humidity': '70%'},
-    {'day': 'Wed', 'icon': Icons.grain,            'temp': '25°C', 'rain': '12 mm', 'humidity': '85%'},
-    {'day': 'Thu', 'icon': Icons.wb_cloudy,        'temp': '27°C', 'rain': '5 mm',  'humidity': '75%'},
-    {'day': 'Fri', 'icon': Icons.wb_sunny,         'temp': '31°C', 'rain': '0 mm',  'humidity': '58%'},
-    {'day': 'Sat', 'icon': Icons.wb_sunny,         'temp': '33°C', 'rain': '0 mm',  'humidity': '52%'},
-    {'day': 'Sun', 'icon': Icons.thunderstorm,     'temp': '24°C', 'rain': '18 mm', 'humidity': '90%'},
+    {
+      'day': 'Mon',
+      'icon': Icons.wb_sunny,
+      'temp': '32°C',
+      'rain': '0 mm',
+      'humidity': '55%'
+    },
+    {
+      'day': 'Tue',
+      'icon': Icons.cloud,
+      'temp': '28°C',
+      'rain': '2 mm',
+      'humidity': '70%'
+    },
+    {
+      'day': 'Wed',
+      'icon': Icons.grain,
+      'temp': '25°C',
+      'rain': '12 mm',
+      'humidity': '85%'
+    },
+    {
+      'day': 'Thu',
+      'icon': Icons.wb_cloudy,
+      'temp': '27°C',
+      'rain': '5 mm',
+      'humidity': '75%'
+    },
+    {
+      'day': 'Fri',
+      'icon': Icons.wb_sunny,
+      'temp': '31°C',
+      'rain': '0 mm',
+      'humidity': '58%'
+    },
+    {
+      'day': 'Sat',
+      'icon': Icons.wb_sunny,
+      'temp': '33°C',
+      'rain': '0 mm',
+      'humidity': '52%'
+    },
+    {
+      'day': 'Sun',
+      'icon': Icons.thunderstorm,
+      'temp': '24°C',
+      'rain': '18 mm',
+      'humidity': '90%'
+    },
   ];
 
   @override
@@ -52,17 +95,25 @@ class TreeWeatherScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Karnataka, India — Plot ${tree.plotNumber}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 13)),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.wb_sunny, color: Colors.yellowAccent, size: 48),
+                  const Row(
+                    children: const [
+                      const Icon(Icons.wb_sunny,
+                          color: Colors.yellowAccent, size: 48),
                       const SizedBox(width: 16),
                       const Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('32°C', style: TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w800)),
-                          Text('Sunny — Good for trees', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                          Text('32°C',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.w800)),
+                          Text('Sunny — Good for trees',
+                              style: TextStyle(
+                                  color: Colors.white70, fontSize: 13)),
                         ],
                       ),
                     ],
@@ -71,10 +122,10 @@ class TreeWeatherScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _currentStat(Icons.water_drop,    'Humidity',   '55%'),
-                      _currentStat(Icons.air,            'Wind',       '12 km/h'),
-                      _currentStat(Icons.grain,          'Rainfall',   '0 mm'),
-                      _currentStat(Icons.wb_twilight,    'UV Index',   'High'),
+                      _currentStat(Icons.water_drop, 'Humidity', '55%'),
+                      _currentStat(Icons.air, 'Wind', '12 km/h'),
+                      _currentStat(Icons.grain, 'Rainfall', '0 mm'),
+                      _currentStat(Icons.wb_twilight, 'UV Index', 'High'),
                     ],
                   ),
                 ],
@@ -85,7 +136,10 @@ class TreeWeatherScreen extends StatelessWidget {
 
             // ── Weekly forecast ──────────────────────────────────
             const Text('7-Day Forecast',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1A2E1C))),
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A2E1C))),
             const SizedBox(height: 12),
 
             Container(
@@ -93,7 +147,11 @@ class TreeWeatherScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10)],
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 10)
+                ],
               ),
               child: Column(
                 children: _weeklyWeather.asMap().entries.map((entry) {
@@ -102,22 +160,32 @@ class TreeWeatherScreen extends StatelessWidget {
                   return Column(
                     children: [
                       Row(children: [
-                        SizedBox(width: 40, child: Text(w['day'] as String,
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
-                        Icon(w['icon'] as IconData, color: Colors.orange, size: 22),
+                        SizedBox(
+                            width: 40,
+                            child: Text(w['day'] as String,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13))),
+                        Icon(w['icon'] as IconData,
+                            color: Colors.orange, size: 22),
                         const SizedBox(width: 10),
                         Text(w['temp'] as String,
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 14)),
                         const Spacer(),
-                        Icon(Icons.grain, color: Colors.blue.shade300, size: 14),
+                        Icon(Icons.grain,
+                            color: Colors.blue.shade300, size: 14),
                         const SizedBox(width: 4),
                         Text(w['rain'] as String,
-                            style: TextStyle(color: Colors.blue.shade600, fontSize: 12)),
+                            style: TextStyle(
+                                color: Colors.blue.shade600, fontSize: 12)),
                         const SizedBox(width: 12),
-                        Icon(Icons.water_drop, color: Colors.teal.shade300, size: 14),
+                        Icon(Icons.water_drop,
+                            color: Colors.teal.shade300, size: 14),
                         const SizedBox(width: 4),
                         Text(w['humidity'] as String,
-                            style: TextStyle(color: Colors.teal.shade700, fontSize: 12)),
+                            style: TextStyle(
+                                color: Colors.teal.shade700, fontSize: 12)),
                       ]),
                       if (i < _weeklyWeather.length - 1)
                         Divider(height: 16, color: Colors.grey.shade100),
@@ -139,7 +207,8 @@ class TreeWeatherScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.green.shade700, size: 20),
+                  Icon(Icons.info_outline,
+                      color: Colors.green.shade700, size: 20),
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
@@ -163,8 +232,13 @@ class TreeWeatherScreen extends StatelessWidget {
       children: [
         Icon(icon, color: Colors.white70, size: 20),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-        Text(label, style: const TextStyle(color: Colors.white60, fontSize: 10)),
+        Text(value,
+            style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 13)),
+        Text(label,
+            style: const TextStyle(color: Colors.white60, fontSize: 10)),
       ],
     );
   }

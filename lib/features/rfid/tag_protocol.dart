@@ -186,7 +186,8 @@ TagData decodeTagData(
       treeIdFromUser = '';
     }
   }
-  final normalizedEpc = epc.replaceAll(RegExp(r'[^0-9a-fA-F]'), '').toUpperCase();
+  final normalizedEpc =
+      epc.replaceAll(RegExp(r'[^0-9a-fA-F]'), '').toUpperCase();
   final treeId = treeIdFromUser.isNotEmpty ? treeIdFromUser : normalizedEpc;
 
   // 16–47: Farmer name (trim trailing 0x00)

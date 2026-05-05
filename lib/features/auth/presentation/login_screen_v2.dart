@@ -178,7 +178,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         onPressed: _loginWithEmail,
                         child: const Text(
                           'LOG IN',
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: Colors.white),
                         ),
                       ),
                     ),

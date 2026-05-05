@@ -22,10 +22,10 @@ class FAQScreen extends StatelessWidget {
       ),
 
       /// BODY
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      body: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         child: Column(
-          children: const [
+          children: [
             _FAQTile(
               question: "How to scan a tree?",
               answer:

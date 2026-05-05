@@ -436,50 +436,36 @@ class _AdminUserManagementScreenState
                         ),
                         const SizedBox(height: 12),
                         Expanded(
-                          child: snapshot.hasError
+                          child: filteredUsers.isEmpty
                               ? Center(
                                   child: Text(
-                                    'Unable to load users: ${snapshot.error}',
+                                    allUsers.isEmpty
+                                        ? 'No users found in Firestore yet.'
+                                        : 'No users match the current search.',
                                     textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.grey.shade700,
+                                    ),
                                   ),
                                 )
-                              : snapshot.connectionState ==
-                                          ConnectionState.waiting &&
-                                      snapshot.data == null
-                                  ? const Center(
-                                      child: CircularProgressIndicator(),
-                                    )
-                                  : filteredUsers.isEmpty
-                                      ? Center(
-                                          child: Text(
-                                            allUsers.isEmpty
-                                                ? 'No users found in Firestore yet.'
-                                                : 'No users match the current search.',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: Colors.grey.shade700,
-                                            ),
-                                          ),
-                                        )
-                                      : ListView.separated(
-                                          itemCount: filteredUsers.length,
-                                          separatorBuilder: (_, __) =>
-                                              const SizedBox(height: 12),
-                                          itemBuilder: (context, index) {
-                                            final user = filteredUsers[index];
-                                            final isCurrentUser =
-                                                user.id == currentUserId;
+                              : ListView.separated(
+                                  itemCount: filteredUsers.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 12),
+                                  itemBuilder: (context, index) {
+                                    final user = filteredUsers[index];
+                                    final isCurrentUser =
+                                        user.id == currentUserId;
 
-                                            return _UserTile(
-                                              user: user,
-                                              isCurrentUser: isCurrentUser,
-                                              onTap: isCurrentUser
-                                                  ? () =>
-                                                      context.push('/profile')
-                                                  : () => _openEditDialog(user),
-                                            );
-                                          },
-                                        ),
+                                    return _UserTile(
+                                      user: user,
+                                      isCurrentUser: isCurrentUser,
+                                      onTap: isCurrentUser
+                                          ? () => context.push('/profile')
+                                          : () => _openEditDialog(user),
+                                    );
+                                  },
+                                ),
                         ),
                       ],
                     ),

@@ -10,8 +10,6 @@ class TreeHistoryScreen extends StatelessWidget {
   const TreeHistoryScreen({super.key, required this.tree});
 
   static const _green1 = Color(0xFF1E4D2B);
-  static const _green2 = Color(0xFF2D6A3F);
-
   @override
   Widget build(BuildContext context) {
     final fmt = DateFormat('MMM d, yyyy');
@@ -19,21 +17,21 @@ class TreeHistoryScreen extends StatelessWidget {
     // Combine health history + maintenance records into one timeline
     final List<Map<String, dynamic>> events = [
       ...tree.healthHistory.map((h) => {
-        'date': h.date,
-        'type': 'health',
-        'title': 'Health Check',
-        'subtitle': h.note,
-        'by': h.recordedBy,
-        'status': h.status,
-      }),
+            'date': h.date,
+            'type': 'health',
+            'title': 'Health Check',
+            'subtitle': h.note,
+            'by': h.recordedBy,
+            'status': h.status,
+          }),
       ...tree.maintenanceRecords.map((m) => {
-        'date': m.date,
-        'type': 'maintenance',
-        'title': m.type,
-        'subtitle': 'Maintenance performed',
-        'by': m.technician,
-        'status': null,
-      }),
+            'date': m.date,
+            'type': 'maintenance',
+            'title': m.type,
+            'subtitle': 'Maintenance performed',
+            'by': m.technician,
+            'status': null,
+          }),
     ]..sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
 
     return Scaffold(
@@ -52,7 +50,8 @@ class TreeHistoryScreen extends StatelessWidget {
                 final e = events[index];
                 final isHealth = e['type'] == 'health';
                 final color = isHealth ? Colors.purple : Colors.blue;
-                final icon  = isHealth ? Icons.favorite : Icons.build_circle_outlined;
+                final icon =
+                    isHealth ? Icons.favorite : Icons.build_circle_outlined;
 
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,7 +60,8 @@ class TreeHistoryScreen extends StatelessWidget {
                     Column(
                       children: [
                         Container(
-                          width: 36, height: 36,
+                          width: 36,
+                          height: 36,
                           decoration: BoxDecoration(
                             color: color.withValues(alpha: 0.12),
                             shape: BoxShape.circle,
@@ -70,7 +70,8 @@ class TreeHistoryScreen extends StatelessWidget {
                         ),
                         if (index < events.length - 1)
                           Container(
-                            width: 2, height: 40,
+                            width: 2,
+                            height: 40,
                             color: Colors.grey.shade300,
                           ),
                       ],
@@ -99,10 +100,12 @@ class TreeHistoryScreen extends StatelessWidget {
                               children: [
                                 Text(e['title'] as String,
                                     style: const TextStyle(
-                                        fontWeight: FontWeight.w700, fontSize: 14)),
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14)),
                                 Text(fmt.format(e['date'] as DateTime),
                                     style: TextStyle(
-                                        color: Colors.grey.shade500, fontSize: 11)),
+                                        color: Colors.grey.shade500,
+                                        fontSize: 11)),
                               ],
                             ),
                             const SizedBox(height: 4),
@@ -116,7 +119,8 @@ class TreeHistoryScreen extends StatelessWidget {
                               const SizedBox(width: 4),
                               Text('By: ${e['by']}',
                                   style: TextStyle(
-                                      color: Colors.grey.shade500, fontSize: 11)),
+                                      color: Colors.grey.shade500,
+                                      fontSize: 11)),
                             ]),
                           ],
                         ),

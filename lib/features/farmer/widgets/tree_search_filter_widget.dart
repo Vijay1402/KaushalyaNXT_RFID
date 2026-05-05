@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../../../data/models/tree_model.dart';
 
 class TreeSearchFilterWidget extends StatefulWidget {
-  final Function(String query, TreeHealthStatus? status, String? species, String? plot) onFilterChanged;
+  final Function(
+          String query, TreeHealthStatus? status, String? species, String? plot)
+      onFilterChanged;
 
   const TreeSearchFilterWidget({super.key, required this.onFilterChanged});
 
@@ -51,27 +53,33 @@ class _TreeSearchFilterWidgetState extends State<TreeSearchFilterWidget> {
               decoration: InputDecoration(
                 hintText: "Search by ID, Name, or RFID",
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty 
-                  ? IconButton(icon: const Icon(Icons.clear), onPressed: () {
-                      _searchController.clear();
-                      _notifyChanges();
-                    }) 
-                  : null,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          _notifyChanges();
+                        })
+                    : null,
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onChanged: (_) => _notifyChanges(),
             ),
             const SizedBox(height: 12),
             ExpansionTile(
-              title: const Text("Filter Options", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              title: const Text("Filter Options",
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
               leading: const Icon(Icons.filter_list),
               children: [
                 _buildStatusFilter(),
-                _buildDropdownFilter("Species", _speciesList, _selectedSpecies, (val) {
+                _buildDropdownFilter("Species", _speciesList, _selectedSpecies,
+                    (val) {
                   setState(() => _selectedSpecies = val);
                   _notifyChanges();
                 }),
-                _buildDropdownFilter("Plot/Location", _plotList, _selectedPlot, (val) {
+                _buildDropdownFilter("Plot/Location", _plotList, _selectedPlot,
+                    (val) {
                   setState(() => _selectedPlot = val);
                   _notifyChanges();
                 }),
@@ -101,7 +109,8 @@ class _TreeSearchFilterWidgetState extends State<TreeSearchFilterWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Health Status", style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const Text("Health Status",
+              style: TextStyle(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -113,7 +122,8 @@ class _TreeSearchFilterWidgetState extends State<TreeSearchFilterWidget> {
                 const SizedBox(width: 8),
                 _buildStatusChip("At-Risk", TreeHealthStatus.atRisk),
                 const SizedBox(width: 8),
-                _buildStatusChip("Needs Attention", TreeHealthStatus.needsAttention),
+                _buildStatusChip(
+                    "Needs Attention", TreeHealthStatus.needsAttention),
               ],
             ),
           ),
@@ -134,11 +144,14 @@ class _TreeSearchFilterWidgetState extends State<TreeSearchFilterWidget> {
         _notifyChanges();
       },
       selectedColor: Colors.green.shade100,
-      labelStyle: TextStyle(fontSize: 12, color: isSelected ? Colors.green.shade900 : Colors.black),
+      labelStyle: TextStyle(
+          fontSize: 12,
+          color: isSelected ? Colors.green.shade900 : Colors.black),
     );
   }
 
-  Widget _buildDropdownFilter(String label, List<String> items, String? currentValue, Function(String?) onChanged) {
+  Widget _buildDropdownFilter(String label, List<String> items,
+      String? currentValue, Function(String?) onChanged) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(

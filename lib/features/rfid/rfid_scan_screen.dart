@@ -14,7 +14,6 @@ import 'rfid_service.dart';
 import 'tag_protocol.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/router/route_paths.dart';
-import '../../core/providers/firebase_providers.dart';
 import '../../core/services/local_cache_service.dart';
 import '../farmer/tree_details/tree_controller.dart';
 

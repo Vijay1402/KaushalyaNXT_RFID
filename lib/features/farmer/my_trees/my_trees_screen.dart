@@ -58,6 +58,7 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
     super.dispose();
   }
 
+  @override
   Widget build(BuildContext context) {
     final treesAsync = ref.watch(treesProvider);
 
@@ -84,7 +85,10 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                ),
               ],
             ),
             child: Column(
@@ -499,7 +503,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
               style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
-            value: month.isEmpty ? null : month,
+            initialValue: month.isEmpty ? null : month,
             hint: const Text("Select Month"),
             isExpanded: true,
             items: months

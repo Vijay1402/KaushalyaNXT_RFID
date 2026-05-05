@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers/firebase_providers.dart';
 import '../../features/farmer/tree_details/tree_controller.dart';
 import 'local_cache_service.dart';
 
