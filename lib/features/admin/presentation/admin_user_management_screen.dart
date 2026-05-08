@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../app/router/route_paths.dart';
 import '../../../core/providers/firebase_providers.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class AdminUserManagementScreen extends ConsumerStatefulWidget {
-  const AdminUserManagementScreen({super.key});
+  const AdminUserManagementScreen({
+    super.key,
+    this.showBackButton = false,
+  });
+
+  final bool showBackButton;
 
   @override
   ConsumerState<AdminUserManagementScreen> createState() =>
@@ -208,48 +212,12 @@ class _AdminUserManagementScreenState
     }
   }
 
-  Future<void> _logout() async {
-    final shouldLogout = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Logout'),
-            content: const Text(
-              'Do you want to sign out from the admin dashboard?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Logout'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-
-    if (!shouldLogout) {
-      return;
-    }
-
-    await ref.read(authStateProvider.notifier).logout();
-    if (!mounted) {
-      return;
-    }
-    context.go(RoutePaths.login);
-  }
-
   String _errorMessage(Object error) {
     return error.toString().replaceFirst('Exception: ', '').trim();
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = ref.watch(authStateProvider).user;
-    final adminName =
-        (currentUser?.name.trim().isNotEmpty ?? false) ? currentUser!.name : '';
     final currentUserId = ref.read(authServiceProvider).getCurrentUser()?.uid;
     final usersAsync = ref.watch(usersSnapshotsProvider);
 
@@ -277,10 +245,10 @@ class _AdminUserManagementScreenState
             return Column(
               children: [
                 _AdminHeader(
-                  adminName: adminName,
-                  onActivityTap: () => context.push(RoutePaths.activityLog),
-                  onProfileTap: () => context.push('/profile'),
-                  onLogoutTap: _logout,
+                  showBackButton: widget.showBackButton,
+                  onBackTap: widget.showBackButton
+                      ? () => Navigator.maybePop(context)
+                      : null,
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -513,102 +481,45 @@ class _AdminUserManagementScreenState
 
 class _AdminHeader extends StatelessWidget {
   const _AdminHeader({
-    required this.adminName,
-    required this.onActivityTap,
-    required this.onProfileTap,
-    required this.onLogoutTap,
+    this.showBackButton = false,
+    this.onBackTap,
   });
 
-  final String adminName;
-  final VoidCallback onActivityTap;
-  final VoidCallback onProfileTap;
-  final VoidCallback onLogoutTap;
+  final bool showBackButton;
+  final VoidCallback? onBackTap;
 
   @override
   Widget build(BuildContext context) {
-    final displayName = adminName.trim().isEmpty ? 'Admin' : adminName.trim();
-
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: const BoxDecoration(
         color: Color(0xFF2E8933),
         borderRadius: BorderRadius.vertical(
           bottom: Radius.circular(28),
         ),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Admin Dashboard',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+          if (showBackButton) ...[
+            IconButton(
+              onPressed: onBackTap,
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
               ),
-              IconButton(
-                onPressed: onActivityTap,
-                icon: const Icon(Icons.history, color: Colors.white),
+            ),
+            const SizedBox(width: 4),
+          ],
+          const Expanded(
+            child: Text(
+              'User Management',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
               ),
-              IconButton(
-                onPressed: onProfileTap,
-                icon: const Icon(Icons.settings, color: Colors.white),
-              ),
-              IconButton(
-                onPressed: onLogoutTap,
-                icon: const Icon(Icons.logout, color: Colors.white),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: const Color(0xFFE7F5E6),
-                child: Text(
-                  _initialsFor(displayName),
-                  style: const TextStyle(
-                    color: Color(0xFF2E8933),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Namaste',
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      displayName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Manage users, data visibility, and admin operations.',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -704,7 +615,7 @@ class _UserTile extends StatelessWidget {
                   backgroundColor:
                       _roleColor(user.role).withValues(alpha: 0.14),
                   child: Text(
-                    _initialsFor(user.name),
+                    _initialsFor(_roleLabel(user.role)),
                     style: TextStyle(
                       color: _roleColor(user.role),
                       fontWeight: FontWeight.w700,
@@ -720,7 +631,9 @@ class _UserTile extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              user.name,
+                              isCurrentUser
+                                  ? 'Current Account'
+                                  : '${_roleLabel(user.role)} Account',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
@@ -751,16 +664,11 @@ class _UserTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        user.email,
+                        isCurrentUser
+                            ? 'Open your profile settings'
+                            : 'Tap to edit account access',
                         style: TextStyle(color: Colors.grey.shade700),
                       ),
-                      if (user.phone.trim().isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          user.phone,
-                          style: TextStyle(color: Colors.grey.shade700),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -786,14 +694,6 @@ class _UserTile extends StatelessWidget {
                   _RoleChip(
                     label: 'Code ${user.managerCode}',
                     color: const Color(0xFF2E8933),
-                  ),
-                if (user.farmManagerName.isNotEmpty)
-                  _RoleChip(
-                    label: user.farmManagerCode.isEmpty
-                        ? 'Linked to ${user.farmManagerName}'
-                        : 'Linked to ${user.farmManagerName} '
-                            '(${user.farmManagerCode})',
-                    color: const Color(0xFF0E7490),
                   ),
               ],
             ),

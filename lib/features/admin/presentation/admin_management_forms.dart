@@ -106,172 +106,10 @@ Future<AdminFarmFormData?> showAdminFarmFormDialog(
   BuildContext context, {
   AdminFarmFormData? initialData,
 }) async {
-  final formKey = GlobalKey<FormState>();
-  final nameController = TextEditingController(text: initialData?.name ?? '');
-  final locationController =
-      TextEditingController(text: initialData?.location ?? '');
-  final areaController = TextEditingController(
-    text: initialData == null || initialData.areaAcres <= 0
-        ? ''
-        : initialData.areaAcres.toString(),
-  );
-  final farmerNameController =
-      TextEditingController(text: initialData?.farmerName ?? '');
-  final farmerPhoneController =
-      TextEditingController(text: initialData?.farmerPhone ?? '');
-  final farmerEmailController =
-      TextEditingController(text: initialData?.farmerEmail ?? '');
-  final farmerIdController =
-      TextEditingController(text: initialData?.farmerId ?? '');
-  final managerIdController =
-      TextEditingController(text: initialData?.managerId ?? '');
-  final latitudeController = TextEditingController(
-    text: initialData?.latitude?.toString() ?? '',
-  );
-  final longitudeController = TextEditingController(
-    text: initialData?.longitude?.toString() ?? '',
-  );
-
-  final result = await showDialog<AdminFarmFormData>(
+  return showDialog<AdminFarmFormData>(
     context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: Text(initialData == null ? 'Add Farm' : 'Edit Farm'),
-        content: SizedBox(
-          width: 420,
-          child: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _AdminFormField(
-                    controller: nameController,
-                    label: 'Farm Name',
-                    validator: _requiredValidator('Farm name'),
-                  ),
-                  const SizedBox(height: 12),
-                  _AdminFormField(
-                    controller: locationController,
-                    label: 'Location',
-                    validator: _requiredValidator('Location'),
-                  ),
-                  const SizedBox(height: 12),
-                  _AdminFormField(
-                    controller: areaController,
-                    label: 'Area (Acres)',
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _AdminFormField(
-                    controller: farmerNameController,
-                    label: 'Farmer Name',
-                  ),
-                  const SizedBox(height: 12),
-                  _AdminFormField(
-                    controller: farmerPhoneController,
-                    label: 'Farmer Phone',
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 12),
-                  _AdminFormField(
-                    controller: farmerEmailController,
-                    label: 'Farmer Email',
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 12),
-                  _AdminFormField(
-                    controller: farmerIdController,
-                    label: 'Farmer User ID',
-                  ),
-                  const SizedBox(height: 12),
-                  _AdminFormField(
-                    controller: managerIdController,
-                    label: 'Manager User ID',
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _AdminFormField(
-                          controller: latitudeController,
-                          label: 'Latitude',
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                            signed: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _AdminFormField(
-                          controller: longitudeController,
-                          label: 'Longitude',
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                            signed: true,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) {
-                return;
-              }
-
-              Navigator.pop(
-                context,
-                AdminFarmFormData(
-                  name: nameController.text.trim(),
-                  location: locationController.text.trim(),
-                  areaAcres: _parseDouble(areaController.text.trim()),
-                  farmerName: farmerNameController.text.trim(),
-                  farmerPhone: farmerPhoneController.text.trim(),
-                  farmerEmail: farmerEmailController.text.trim(),
-                  farmerId: farmerIdController.text.trim(),
-                  managerId: managerIdController.text.trim(),
-                  latitude: _parseNullableDouble(
-                    latitudeController.text.trim(),
-                  ),
-                  longitude: _parseNullableDouble(
-                    longitudeController.text.trim(),
-                  ),
-                ),
-              );
-            },
-            child: Text(initialData == null ? 'Add' : 'Save'),
-          ),
-        ],
-      );
-    },
+    builder: (context) => _AdminFarmFormDialog(initialData: initialData),
   );
-
-  nameController.dispose();
-  locationController.dispose();
-  areaController.dispose();
-  farmerNameController.dispose();
-  farmerPhoneController.dispose();
-  farmerEmailController.dispose();
-  farmerIdController.dispose();
-  managerIdController.dispose();
-  latitudeController.dispose();
-  longitudeController.dispose();
-
-  return result;
 }
 
 Future<AdminTreeFormData?> showAdminTreeFormDialog(
@@ -280,248 +118,480 @@ Future<AdminTreeFormData?> showAdminTreeFormDialog(
   required String defaultFarmerName,
   AdminTreeFormData? initialData,
 }) async {
-  final formKey = GlobalKey<FormState>();
-  final treeIdController =
-      TextEditingController(text: initialData?.treeId ?? '');
-  final speciesController =
-      TextEditingController(text: initialData?.species ?? '');
-  final locationController =
-      TextEditingController(text: initialData?.location ?? '');
-  final farmerNameController = TextEditingController(
-    text: initialData?.farmerName ?? defaultFarmerName,
-  );
-  final ageController = TextEditingController(
-    text: initialData == null || initialData.ageYears <= 0
-        ? ''
-        : initialData.ageYears.toString(),
-  );
-  final yieldController = TextEditingController(
-    text: initialData == null || initialData.lastYieldKg <= 0
-        ? ''
-        : initialData.lastYieldKg.toString(),
-  );
-  final harvestMonthController =
-      TextEditingController(text: initialData?.harvestMonth ?? '');
-  final latitudeController = TextEditingController(
-    text: initialData?.latitude?.toString() ?? '',
-  );
-  final longitudeController = TextEditingController(
-    text: initialData?.longitude?.toString() ?? '',
-  );
-  final rfidController = TextEditingController(text: initialData?.rfid ?? '');
-  var healthStatus = initialData?.healthStatus ?? '0';
-  var isScanned = initialData?.isScanned ?? false;
-
-  final result = await showDialog<AdminTreeFormData>(
+  return showDialog<AdminTreeFormData>(
     context: context,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: Text(initialData == null ? 'Add Tree' : 'Edit Tree'),
-            content: SizedBox(
-              width: 420,
-              child: Form(
-                key: formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Farm: $farmName',
-                        style: TextStyle(
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _AdminFormField(
-                        controller: treeIdController,
-                        label: 'Tree ID',
-                        validator: _requiredValidator('Tree ID'),
-                      ),
-                      const SizedBox(height: 12),
-                      _AdminFormField(
-                        controller: speciesController,
-                        label: 'Species',
-                        validator: _requiredValidator('Species'),
-                      ),
-                      const SizedBox(height: 12),
-                      _AdminFormField(
-                        controller: locationController,
-                        label: 'Tree Location / Plot',
-                      ),
-                      const SizedBox(height: 12),
-                      _AdminFormField(
-                        controller: farmerNameController,
-                        label: 'Farmer Name',
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        initialValue: healthStatus,
-                        decoration: const InputDecoration(
-                          labelText: 'Health Status',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: '0',
-                            child: Text('Healthy'),
-                          ),
-                          DropdownMenuItem(
-                            value: '1',
-                            child: Text('Needs Attention'),
-                          ),
-                          DropdownMenuItem(
-                            value: '2',
-                            child: Text('At Risk'),
-                          ),
-                          DropdownMenuItem(
-                            value: '3',
-                            child: Text('Critical'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value == null) {
-                            return;
-                          }
-                          setDialogState(() {
-                            healthStatus = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _AdminFormField(
-                              controller: ageController,
-                              label: 'Age (Years)',
-                              keyboardType: TextInputType.number,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _AdminFormField(
-                              controller: yieldController,
-                              label: 'Last Yield (Kg)',
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                decimal: true,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _AdminFormField(
-                        controller: harvestMonthController,
-                        label: 'Harvest Month',
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _AdminFormField(
-                              controller: latitudeController,
-                              label: 'Latitude',
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                decimal: true,
-                                signed: true,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _AdminFormField(
-                              controller: longitudeController,
-                              label: 'Longitude',
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                decimal: true,
-                                signed: true,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _AdminFormField(
-                        controller: rfidController,
-                        label: 'RFID',
-                      ),
-                      const SizedBox(height: 4),
-                      CheckboxListTile(
-                        value: isScanned,
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Mark tree as scanned'),
-                        onChanged: (value) {
-                          setDialogState(() {
-                            isScanned = value ?? false;
-                          });
-                        },
-                      ),
-                    ],
+    builder: (context) => _AdminTreeFormDialog(
+      farmName: farmName,
+      defaultFarmerName: defaultFarmerName,
+      initialData: initialData,
+    ),
+  );
+}
+
+class _AdminFarmFormDialog extends StatefulWidget {
+  const _AdminFarmFormDialog({
+    this.initialData,
+  });
+
+  final AdminFarmFormData? initialData;
+
+  @override
+  State<_AdminFarmFormDialog> createState() => _AdminFarmFormDialogState();
+}
+
+class _AdminFarmFormDialogState extends State<_AdminFarmFormDialog> {
+  final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _nameController;
+  late final TextEditingController _locationController;
+  late final TextEditingController _areaController;
+  late final TextEditingController _farmerNameController;
+  late final TextEditingController _farmerPhoneController;
+  late final TextEditingController _farmerEmailController;
+  late final TextEditingController _farmerIdController;
+  late final TextEditingController _managerIdController;
+  late final TextEditingController _latitudeController;
+  late final TextEditingController _longitudeController;
+
+  @override
+  void initState() {
+    super.initState();
+    final initialData = widget.initialData;
+    _nameController = TextEditingController(text: initialData?.name ?? '');
+    _locationController =
+        TextEditingController(text: initialData?.location ?? '');
+    _areaController = TextEditingController(
+      text: initialData == null || initialData.areaAcres <= 0
+          ? ''
+          : initialData.areaAcres.toString(),
+    );
+    _farmerNameController =
+        TextEditingController(text: initialData?.farmerName ?? '');
+    _farmerPhoneController =
+        TextEditingController(text: initialData?.farmerPhone ?? '');
+    _farmerEmailController =
+        TextEditingController(text: initialData?.farmerEmail ?? '');
+    _farmerIdController =
+        TextEditingController(text: initialData?.farmerId ?? '');
+    _managerIdController =
+        TextEditingController(text: initialData?.managerId ?? '');
+    _latitudeController = TextEditingController(
+      text: initialData?.latitude?.toString() ?? '',
+    );
+    _longitudeController = TextEditingController(
+      text: initialData?.longitude?.toString() ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _locationController.dispose();
+    _areaController.dispose();
+    _farmerNameController.dispose();
+    _farmerPhoneController.dispose();
+    _farmerEmailController.dispose();
+    _farmerIdController.dispose();
+    _managerIdController.dispose();
+    _latitudeController.dispose();
+    _longitudeController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    Navigator.pop(
+      context,
+      AdminFarmFormData(
+        name: _nameController.text.trim(),
+        location: _locationController.text.trim(),
+        areaAcres: _parseDouble(_areaController.text.trim()),
+        farmerName: _farmerNameController.text.trim(),
+        farmerPhone: _farmerPhoneController.text.trim(),
+        farmerEmail: _farmerEmailController.text.trim(),
+        farmerId: _farmerIdController.text.trim(),
+        managerId: _managerIdController.text.trim(),
+        latitude: _parseNullableDouble(_latitudeController.text.trim()),
+        longitude: _parseNullableDouble(_longitudeController.text.trim()),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.initialData == null ? 'Add Farm' : 'Edit Farm'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _AdminFormField(
+                  controller: _nameController,
+                  label: 'Farm Name',
+                  validator: _requiredValidator('Farm name'),
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _locationController,
+                  label: 'Location',
+                  validator: _requiredValidator('Location'),
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _areaController,
+                  label: 'Area (Acres)',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
                 ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (!formKey.currentState!.validate()) {
-                    return;
-                  }
-
-                  Navigator.pop(
-                    context,
-                    AdminTreeFormData(
-                      treeId: treeIdController.text.trim(),
-                      species: speciesController.text.trim(),
-                      location: locationController.text.trim(),
-                      farmerName: farmerNameController.text.trim(),
-                      healthStatus: healthStatus,
-                      ageYears: _parseInt(ageController.text.trim()),
-                      lastYieldKg: _parseDouble(yieldController.text.trim()),
-                      harvestMonth: harvestMonthController.text.trim(),
-                      latitude: _parseNullableDouble(
-                        latitudeController.text.trim(),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _farmerNameController,
+                  label: 'Farmer Name',
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _farmerPhoneController,
+                  label: 'Farmer Phone',
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _farmerEmailController,
+                  label: 'Farmer Email',
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _farmerIdController,
+                  label: 'Farmer User ID',
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _managerIdController,
+                  label: 'Manager User ID',
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _AdminFormField(
+                        controller: _latitudeController,
+                        label: 'Latitude',
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                          signed: true,
+                        ),
                       ),
-                      longitude: _parseNullableDouble(
-                        longitudeController.text.trim(),
-                      ),
-                      rfid: rfidController.text.trim(),
-                      isScanned: isScanned,
                     ),
-                  );
-                },
-                child: Text(initialData == null ? 'Add' : 'Save'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _AdminFormField(
+                        controller: _longitudeController,
+                        label: 'Longitude',
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                          signed: true,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _submit,
+          child: Text(widget.initialData == null ? 'Add' : 'Save'),
+        ),
+      ],
+    );
+  }
+}
 
-  treeIdController.dispose();
-  speciesController.dispose();
-  locationController.dispose();
-  farmerNameController.dispose();
-  ageController.dispose();
-  yieldController.dispose();
-  harvestMonthController.dispose();
-  latitudeController.dispose();
-  longitudeController.dispose();
-  rfidController.dispose();
+class _AdminTreeFormDialog extends StatefulWidget {
+  const _AdminTreeFormDialog({
+    required this.farmName,
+    required this.defaultFarmerName,
+    this.initialData,
+  });
 
-  return result;
+  final String farmName;
+  final String defaultFarmerName;
+  final AdminTreeFormData? initialData;
+
+  @override
+  State<_AdminTreeFormDialog> createState() => _AdminTreeFormDialogState();
+}
+
+class _AdminTreeFormDialogState extends State<_AdminTreeFormDialog> {
+  final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _treeIdController;
+  late final TextEditingController _speciesController;
+  late final TextEditingController _locationController;
+  late final TextEditingController _farmerNameController;
+  late final TextEditingController _ageController;
+  late final TextEditingController _yieldController;
+  late final TextEditingController _harvestMonthController;
+  late final TextEditingController _latitudeController;
+  late final TextEditingController _longitudeController;
+  late final TextEditingController _rfidController;
+
+  late String _healthStatus;
+  late bool _isScanned;
+
+  @override
+  void initState() {
+    super.initState();
+    final initialData = widget.initialData;
+    _treeIdController = TextEditingController(text: initialData?.treeId ?? '');
+    _speciesController =
+        TextEditingController(text: initialData?.species ?? '');
+    _locationController =
+        TextEditingController(text: initialData?.location ?? '');
+    _farmerNameController = TextEditingController(
+      text: initialData?.farmerName ?? widget.defaultFarmerName,
+    );
+    _ageController = TextEditingController(
+      text: initialData == null || initialData.ageYears <= 0
+          ? ''
+          : initialData.ageYears.toString(),
+    );
+    _yieldController = TextEditingController(
+      text: initialData == null || initialData.lastYieldKg <= 0
+          ? ''
+          : initialData.lastYieldKg.toString(),
+    );
+    _harvestMonthController =
+        TextEditingController(text: initialData?.harvestMonth ?? '');
+    _latitudeController = TextEditingController(
+      text: initialData?.latitude?.toString() ?? '',
+    );
+    _longitudeController = TextEditingController(
+      text: initialData?.longitude?.toString() ?? '',
+    );
+    _rfidController = TextEditingController(text: initialData?.rfid ?? '');
+    _healthStatus = initialData?.healthStatus ?? '0';
+    _isScanned = initialData?.isScanned ?? false;
+  }
+
+  @override
+  void dispose() {
+    _treeIdController.dispose();
+    _speciesController.dispose();
+    _locationController.dispose();
+    _farmerNameController.dispose();
+    _ageController.dispose();
+    _yieldController.dispose();
+    _harvestMonthController.dispose();
+    _latitudeController.dispose();
+    _longitudeController.dispose();
+    _rfidController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    Navigator.pop(
+      context,
+      AdminTreeFormData(
+        treeId: _treeIdController.text.trim(),
+        species: _speciesController.text.trim().isEmpty
+            ? 'Unknown'
+            : _speciesController.text.trim(),
+        location: _locationController.text.trim(),
+        farmerName: _farmerNameController.text.trim(),
+        healthStatus: _healthStatus,
+        ageYears: _parseInt(_ageController.text.trim()),
+        lastYieldKg: _parseDouble(_yieldController.text.trim()),
+        harvestMonth: _harvestMonthController.text.trim(),
+        latitude: _parseNullableDouble(_latitudeController.text.trim()),
+        longitude: _parseNullableDouble(_longitudeController.text.trim()),
+        rfid: _rfidController.text.trim(),
+        isScanned: _isScanned,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.initialData == null ? 'Add Tree' : 'Edit Tree'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Farm: ${widget.farmName}',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _treeIdController,
+                  label: 'Tree ID',
+                  validator: _requiredValidator('Tree ID'),
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _speciesController,
+                  label: 'Species',
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _locationController,
+                  label: 'Tree Location / Plot',
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _farmerNameController,
+                  label: 'Farmer Name',
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _healthStatus,
+                  decoration: const InputDecoration(
+                    labelText: 'Health Status',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: '0',
+                      child: Text('Healthy'),
+                    ),
+                    DropdownMenuItem(
+                      value: '1',
+                      child: Text('Needs Attention'),
+                    ),
+                    DropdownMenuItem(
+                      value: '2',
+                      child: Text('At Risk'),
+                    ),
+                    DropdownMenuItem(
+                      value: '3',
+                      child: Text('Critical'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+                    setState(() {
+                      _healthStatus = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _AdminFormField(
+                        controller: _ageController,
+                        label: 'Age (Years)',
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _AdminFormField(
+                        controller: _yieldController,
+                        label: 'Last Yield (Kg)',
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _harvestMonthController,
+                  label: 'Harvest Month',
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _AdminFormField(
+                        controller: _latitudeController,
+                        label: 'Latitude',
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                          signed: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _AdminFormField(
+                        controller: _longitudeController,
+                        label: 'Longitude',
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                          signed: true,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _AdminFormField(
+                  controller: _rfidController,
+                  label: 'RFID',
+                ),
+                const SizedBox(height: 4),
+                CheckboxListTile(
+                  value: _isScanned,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Mark tree as scanned'),
+                  onChanged: (value) {
+                    setState(() {
+                      _isScanned = value ?? false;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _submit,
+          child: Text(widget.initialData == null ? 'Add' : 'Save'),
+        ),
+      ],
+    );
+  }
 }
 
 class _AdminFormField extends StatelessWidget {

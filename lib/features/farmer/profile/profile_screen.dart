@@ -4,7 +4,12 @@ import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({
+    super.key,
+    this.showBackButton = true,
+  });
+
+  final bool showBackButton;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,12 +36,15 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            context.pop();
-          },
-        ),
+        automaticallyImplyLeading: showBackButton,
+        leading: showBackButton
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  context.pop();
+                },
+              )
+            : null,
         title: const Text("Profile"),
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,

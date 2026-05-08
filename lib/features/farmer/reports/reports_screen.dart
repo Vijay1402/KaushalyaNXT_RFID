@@ -1,267 +1,335 @@
-// ============================================================
-//  lib/features/reports/reports_screen.dart
-// ============================================================
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
-import '../../../data/models/tree_model.dart';
 
-// ─────────────────────────────────────────────────────────────
-//  REPORTS SCREEN
-// ─────────────────────────────────────────────────────────────
-class ReportsScreen extends StatefulWidget {
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' hide TextDirection;
+
+import '../../auth/providers/auth_provider.dart';
+import '../tree_details/tree_controller.dart';
+
+class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
 
   @override
-  State<ReportsScreen> createState() => _ReportsScreenState();
+  ConsumerState<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen>
-    with TickerProviderStateMixin {
-  // ── Filter state ───────────────────────────────────────────
-  String? _selectedSpecies; // null = all species
-  String?
-      _selectedHealth; // null = all | 'Healthy' | 'Unhealthy' | 'Recovering'
+class _ReportsScreenState extends ConsumerState<ReportsScreen> {
+  String selectedRange = 'Last 30 days';
+  String healthMode = 'weekly';
+  String? _selectedSpecies;
+  String? _selectedHealth;
 
-  // ── Species options (replace with your real ones later) ────
-  final List<String> _allSpecies = [
-    'Mango',
-    'Jackfruit',
-    'Apple',
-    'Orange',
-    'Pine',
-    'Banana',
-    'Coconut',
-    'Guava',
-  ];
-
-  // ── Animation controllers ──────────────────────────────────
-  late AnimationController _pieCtrl;
-  late AnimationController _ageBarCtrl;
-  late AnimationController _weekBarCtrl;
-  late Animation<double> _pieAnim;
-  late Animation<double> _ageBarAnim;
-  late Animation<double> _weekBarAnim;
-
-  // ── Colours ────────────────────────────────────────────────
-  static const _dark = Color(0xFF1A2E1C);
-  static const _green1 = Color(0xFF1E4D2B);
-  static const _green2 = Color(0xFF2D6A3F);
-  static const _green3 = Color(0xFF4E9B64);
-  static const _green4 = Color(0xFFA5D6A7);
-  static const _green5 = Color(0xFFC8E6C9);
-  static const _orange = Color(0xFFE07B2A);
-  static const _bg = Color(0xFFF7F5F0);
-  static const _sub = Color(0xFF8FAF96);
-
-  // ── Filtered tree list (recomputed on every filter change) ─
-  List<Tree> get _filtered {
-    return mockTrees.where((t) {
-      // species filter
-      if (_selectedSpecies != null &&
-          !t.species.toLowerCase().contains(_selectedSpecies!.toLowerCase())) {
-        return false;
-      }
-      // health filter
-      if (_selectedHealth != null) {
-        switch (_selectedHealth) {
-          case 'Healthy':
-            if (t.currentStatus != TreeHealthStatus.healthy) {
-              return false;
-            }
-            break;
-          case 'Unhealthy':
-            if (t.currentStatus != TreeHealthStatus.atRisk &&
-                t.currentStatus != TreeHealthStatus.sick) {
-              return false;
-            }
-            break;
-          case 'Recovering':
-            if (t.currentStatus != TreeHealthStatus.needsAttention) {
-              return false;
-            }
-            break;
-        }
-      }
-      return true;
-    }).toList();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _initAnimations();
-    _runAnimations();
-  }
-
-  void _initAnimations() {
-    _pieCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 900));
-    _ageBarCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 850));
-    _weekBarCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 850));
-
-    _pieAnim = CurvedAnimation(parent: _pieCtrl, curve: Curves.easeOutCubic);
-    _ageBarAnim =
-        CurvedAnimation(parent: _ageBarCtrl, curve: Curves.easeOutCubic);
-    _weekBarAnim =
-        CurvedAnimation(parent: _weekBarCtrl, curve: Curves.easeOutCubic);
-  }
-
-  void _runAnimations() {
-    _pieCtrl.forward(from: 0);
-    Future.delayed(const Duration(milliseconds: 120), () {
-      if (mounted) _ageBarCtrl.forward(from: 0);
-    });
-    Future.delayed(const Duration(milliseconds: 240), () {
-      if (mounted) _weekBarCtrl.forward(from: 0);
-    });
-  }
-
-  // Called whenever a filter changes — resets & reruns animations
-  void _applyFilter(
-      {String? species,
-      String? health,
-      bool clearSpecies = false,
-      bool clearHealth = false}) {
-    setState(() {
-      if (clearSpecies) {
-        _selectedSpecies = null;
-      } else if (species != null) {
-        _selectedSpecies = (_selectedSpecies == species) ? null : species;
-      }
-      if (clearHealth) {
-        _selectedHealth = null;
-      } else if (health != null) {
-        _selectedHealth = (_selectedHealth == health) ? null : health;
-      }
-    });
-    _runAnimations();
-  }
-
-  @override
-  void dispose() {
-    _pieCtrl.dispose();
-    _ageBarCtrl.dispose();
-    _weekBarCtrl.dispose();
-    super.dispose();
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //  BUILD
-  // ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final trees = _filtered;
-
-    // ── Computed stats from filtered list ──────────────────────
-    final total = trees.length;
-    final healthy =
-        trees.where((t) => t.currentStatus == TreeHealthStatus.healthy).length;
-    final unhealthy = trees
-        .where((t) =>
-            t.currentStatus == TreeHealthStatus.atRisk ||
-            t.currentStatus == TreeHealthStatus.sick)
-        .length;
-    final recovering = trees
-        .where((t) => t.currentStatus == TreeHealthStatus.needsAttention)
-        .length;
-
-    final now = DateTime.now();
-    final age0to1 =
-        trees.where((t) => now.difference(t.plantingDate).inDays < 365).length;
-    final age1to5 = trees.where((t) {
-      final d = now.difference(t.plantingDate).inDays;
-      return d >= 365 && d < 365 * 5;
-    }).length;
-    final age5plus = trees
-        .where((t) => now.difference(t.plantingDate).inDays >= 365 * 5)
-        .length;
-
-    final totalYield = trees.fold<double>(
-        0, (s, t) => s + (t.maintenanceRecords.length * 48.0 + 50));
-    final avgYield = total > 0 ? totalYield / total : 0.0;
-    final sortedYield = [...trees]..sort((a, b) =>
-        b.maintenanceRecords.length.compareTo(a.maintenanceRecords.length));
-    final topTree = sortedYield.isNotEmpty ? sortedYield.first : null;
-    final topYieldKg =
-        topTree != null ? (topTree.maintenanceRecords.length * 48.0 + 50) : 0.0;
-
-    final base = math.max(total, 1);
-    final weekCounts = [
-      (base * 0.40).round(),
-      (base * 0.70).round(),
-      (base * 0.30).round(),
-      (base * 0.85).round(),
-      (base * 1.00).round(),
-      (base * 0.25).round(),
-      (base * 0.15).round(),
-    ];
-    final todayScans = (base * 0.18).round().clamp(1, 999);
-    final weekScans = weekCounts.fold(0, (a, b) => a + b);
+    final user = ref.watch(authStateProvider).user;
+    final treesAsync = ref.watch(treesProvider);
+    final previewTrees = _normalizeTrees(treesAsync.valueOrNull ?? const []);
+    final speciesOptions = _speciesOptions(previewTrees);
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: Colors.grey[100],
       body: Column(
         children: [
-          _buildHeader(),
-          _buildFilterRow(),
+          _buildHeader(user?.name ?? user?.email ?? 'Farmer'),
+          _buildFilterRow(speciesOptions),
           Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-              child: Column(
-                children: [
-                  // ── Yield overview ────────────────────────────
-                  _buildYieldOverview(
-                    total: total,
-                    totalYield: totalYield,
-                    avgYield: avgYield,
-                    topTree: topTree?.name ?? 'N/A',
-                    topYieldKg: topYieldKg,
-                  ),
-                  const SizedBox(height: 12),
+            child: treesAsync.when(
+              data: (rawTrees) {
+                final trees = _filteredTrees(_normalizeTrees(rawTrees));
+                final metrics = _buildMetrics(trees);
+                final healthMetrics = _buildHealthMetrics(trees);
+                final trend = _buildTrendSeries(trees, selectedRange);
+                final activity = _buildActivityMetrics(trees);
 
-                  // ── Health dist + Age dist ────────────────────
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: _buildHealthDistCard(
-                            total: total,
-                            healthy: healthy,
-                            unhealthy: unhealthy,
-                            recovering: recovering,
-                            todayScans: todayScans,
-                            weekScans: weekScans,
+                return SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _metricCard(
+                                    metrics.totalTreesLabel,
+                                    'Total Trees',
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _metricCard(
+                                    metrics.averageYieldLabel,
+                                    'Avg Yield',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _metricCard(
+                                    metrics.healthyTreesLabel,
+                                    'Healthy',
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _metricCard(
+                                    metrics.atRiskTreesLabel,
+                                    'At risk',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Health Distribution',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  Row(
+                                    children: [
+                                      _modeChip(
+                                        'weekly',
+                                        selected: healthMode == 'weekly',
+                                        onTap: () {
+                                          setState(() => healthMode = 'weekly');
+                                        },
+                                      ),
+                                      const SizedBox(width: 8),
+                                      _modeChip(
+                                        'monthly',
+                                        selected: healthMode == 'monthly',
+                                        showArrow: true,
+                                        onTap: _showHealthModeSheet,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    height: 120,
+                                    width: 120,
+                                    child: CustomPaint(
+                                      painter: _PieChartPainter(
+                                        sections: [
+                                          _PieSection(
+                                            value: healthMetrics.healthyCount
+                                                .toDouble(),
+                                            color: Colors.green,
+                                          ),
+                                          _PieSection(
+                                            value: healthMetrics
+                                                .needsAttentionCount
+                                                .toDouble(),
+                                            color: Colors.orange,
+                                          ),
+                                          _PieSection(
+                                            value: healthMetrics.atRiskCount
+                                                .toDouble(),
+                                            color: Colors.red,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        _legendRow(
+                                          'Healthy',
+                                          healthMetrics.healthyPercentLabel,
+                                          Colors.green,
+                                        ),
+                                        const SizedBox(height: 10),
+                                        _legendRow(
+                                          'Needs Attention',
+                                          healthMetrics
+                                              .needsAttentionPercentLabel,
+                                          Colors.orange,
+                                        ),
+                                        const SizedBox(height: 10),
+                                        _legendRow(
+                                          'At Risk',
+                                          healthMetrics.atRiskPercentLabel,
+                                          Colors.red,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildAgeDistCard(
-                            age0to1: age0to1,
-                            age1to5: age1to5,
-                            age5plus: age5plus,
-                            todayScans: todayScans,
-                            weekScans: weekScans,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Yield Trends',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  InkWell(
+                                    onTap: _showRangeSheet,
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 2,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            selectedRange,
+                                            style: const TextStyle(
+                                              color: Colors.green,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          const Icon(
+                                            Icons.keyboard_arrow_down,
+                                            size: 18,
+                                            color: Colors.green,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                height: 220,
+                                child: CustomPaint(
+                                  size: Size.infinite,
+                                  painter: _LineChartPainter(
+                                    values: trend.values,
+                                    bottomLabels: trend.bottomLabels,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.qr_code,
+                                        color: Colors.orange,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      child: Text(
+                                        'RFID Activity',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'Today: ${activity.todayCount}',
+                                    style: const TextStyle(
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Week: ${activity.weekCount}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-
-                  // ── Weekly trend ──────────────────────────────
-                  _buildWeeklyTrendCard(weekCounts: weekCounts),
-                  const SizedBox(height: 12),
-
-                  // ── RFID activity ─────────────────────────────
-                  _buildRFIDActivityCard(
-                    todayScans: todayScans,
-                    weekScans: weekScans,
+                );
+              },
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+              ),
+              error: (error, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Unable to load analytics right now.\n$error',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.black54),
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -270,973 +338,931 @@ class _ReportsScreenState extends State<ReportsScreen>
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  HEADER
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildHeader() {
+  Widget _buildHeader(String userLabel) {
     return Container(
-      color: _green1,
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      height: 100,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      color: const Color(0xFF2E7D32),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
               children: [
-                const Text('Reports & Analysis',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
-                Text('Last updated: just now',
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.60),
-                        fontSize: 11)),
+                InkWell(
+                  onTap: () {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.menu, color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Analytics Dashboard',
+                  style: TextStyle(color: Colors.white),
+                ),
               ],
             ),
-          ),
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
+            CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Text(
+                _initials(userLabel),
+                style: const TextStyle(
+                  color: Color(0xFF2E7D32),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
-            child: const Icon(Icons.notifications_outlined,
-                color: Colors.white, size: 18),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  FILTER ROW  — functional Species & Health filters
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildFilterRow() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+  Widget _buildFilterRow(List<String> speciesOptions) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            // ── Filters label chip (decorative) ────────────────
-            _filterChip(
-              label: 'Filters',
-              icon: Icons.filter_list,
-              isActive: false,
-              onTap: () {},
-            ),
-            const SizedBox(width: 8),
-
-            // ── Species dropdown ────────────────────────────────
-            GestureDetector(
-              onTap: () => _showSpeciesSheet(),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _selectedSpecies != null ? _green1 : _bg,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: _selectedSpecies != null
-                        ? _green1
-                        : Colors.grey.shade300,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _selectedSpecies ?? 'Species',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: _selectedSpecies != null
-                            ? Colors.white
-                            : const Color(0xFF4A6350),
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    Icon(Icons.keyboard_arrow_down,
-                        size: 14,
-                        color: _selectedSpecies != null
-                            ? Colors.white
-                            : const Color(0xFF4A6350)),
-                    if (_selectedSpecies != null) ...[
-                      const SizedBox(width: 4),
-                      GestureDetector(
-                        onTap: () => _applyFilter(clearSpecies: true),
-                        child: const Icon(Icons.close,
-                            size: 12, color: Colors.white),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // ── Health dropdown ─────────────────────────────────
-            GestureDetector(
-              onTap: () => _showHealthSheet(),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _selectedHealth != null ? _green1 : _bg,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: _selectedHealth != null
-                        ? _green1
-                        : Colors.grey.shade300,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _selectedHealth ?? 'Health',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: _selectedHealth != null
-                            ? Colors.white
-                            : const Color(0xFF4A6350),
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    Icon(Icons.keyboard_arrow_down,
-                        size: 14,
-                        color: _selectedHealth != null
-                            ? Colors.white
-                            : const Color(0xFF4A6350)),
-                    if (_selectedHealth != null) ...[
-                      const SizedBox(width: 4),
-                      GestureDetector(
-                        onTap: () => _applyFilter(clearHealth: true),
-                        child: const Icon(Icons.close,
-                            size: 12, color: Colors.white),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Species bottom sheet ────────────────────────────────────
-  void _showSpeciesSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text('Filter by Species',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: _dark)),
-                const Spacer(),
-                if (_selectedSpecies != null)
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _applyFilter(clearSpecies: true);
-                    },
-                    child:
-                        const Text('Clear', style: TextStyle(color: _orange)),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _allSpecies.map((sp) {
-                final active = _selectedSpecies == sp;
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-                    _applyFilter(species: sp);
-                  },
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: active ? _green1 : _bg,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: active ? _green1 : Colors.grey.shade300),
-                    ),
-                    child: Text(sp,
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: active ? Colors.white : _dark)),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Health bottom sheet ─────────────────────────────────────
-  void _showHealthSheet() {
-    final options = [
-      {'label': 'Healthy', 'icon': Icons.favorite, 'color': _green3},
-      {'label': 'Unhealthy', 'icon': Icons.warning_amber, 'color': _orange},
-      {
-        'label': 'Recovering',
-        'icon': Icons.healing,
-        'color': Colors.blue.shade400
-      },
-    ];
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text('Filter by Health',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: _dark)),
-                const Spacer(),
-                if (_selectedHealth != null)
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _applyFilter(clearHealth: true);
-                    },
-                    child:
-                        const Text('Clear', style: TextStyle(color: _orange)),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...options.map((opt) {
-              final label = opt['label'] as String;
-              final icon = opt['icon'] as IconData;
-              final color = opt['color'] as Color;
-              final active = _selectedHealth == label;
-              return GestureDetector(
-                onTap: () {
-                  Navigator.pop(context);
-                  _applyFilter(health: label);
+            _filterButton(Icons.filter_list, 'Filters'),
+            const SizedBox(width: 10),
+            InkWell(
+              onTap: () => _showSelectionSheet(
+                title: 'Species',
+                options: speciesOptions,
+                selectedValue: _selectedSpecies,
+                allLabel: 'All Species',
+                onSelected: (value) {
+                  setState(() => _selectedSpecies = value);
                 },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: active ? color.withValues(alpha: 0.12) : _bg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: active ? color : Colors.grey.shade200,
-                        width: active ? 1.5 : 1),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(icon, color: color, size: 20),
-                      const SizedBox(width: 12),
-                      Text(label,
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: active ? color : _dark)),
-                      const Spacer(),
-                      if (active)
-                        Icon(Icons.check_circle, color: color, size: 18),
-                    ],
-                  ),
-                ),
-              );
-            }),
+              ),
+              borderRadius: BorderRadius.circular(25),
+              child: _filterButton(
+                Icons.eco,
+                _selectedSpecies ?? 'Species',
+                isDropdown: true,
+              ),
+            ),
+            const SizedBox(width: 10),
+            InkWell(
+              onTap: () => _showSelectionSheet(
+                title: 'Health',
+                options: const ['Healthy', 'Needs Attention', 'At Risk'],
+                selectedValue: _selectedHealth,
+                allLabel: 'All Health',
+                onSelected: (value) {
+                  setState(() => _selectedHealth = value);
+                },
+              ),
+              borderRadius: BorderRadius.circular(25),
+              child: _filterButton(
+                Icons.favorite,
+                _selectedHealth ?? 'Health',
+                isDropdown: true,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ── Decorative filter chip ──────────────────────────────────
-  Widget _filterChip({
-    required String label,
-    required IconData icon,
-    required bool isActive,
+  Widget _metricCard(String value, String label) {
+    return Container(
+      height: 90,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(label),
+              ],
+            ),
+          ),
+          Container(
+            height: 40,
+            width: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFF2E7D32).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.park_rounded,
+              color: Color(0xFF2E7D32),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterButton(IconData icon, String text, {bool isDropdown = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 6),
+          Text(text),
+          if (isDropdown) const Icon(Icons.keyboard_arrow_down),
+        ],
+      ),
+    );
+  }
+
+  Widget _legendRow(String title, String value, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Container(
+                height: 8,
+                width: 8,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(value),
+      ],
+    );
+  }
+
+  Widget _modeChip(
+    String label, {
+    required bool selected,
     required VoidCallback onTap,
+    bool showArrow = false,
   }) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isActive ? _green1 : _bg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isActive ? _green1 : Colors.grey.shade300),
+          color: selected
+              ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+              : Colors.grey[200],
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 12,
-                color: isActive ? Colors.white : const Color(0xFF4A6350)),
-            const SizedBox(width: 4),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: isActive ? Colors.white : const Color(0xFF4A6350))),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? const Color(0xFF2E7D32) : Colors.black87,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+            if (showArrow) ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.keyboard_arrow_down, size: 16),
+            ],
           ],
         ),
       ),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  YIELD OVERVIEW
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildYieldOverview({
-    required int total,
-    required double totalYield,
-    required double avgYield,
-    required String topTree,
-    required double topYieldKg,
-  }) {
-    final totalStr = totalYield >= 1000
-        ? '${(totalYield / 1000).toStringAsFixed(1)}k kg'
-        : '${totalYield.toStringAsFixed(0)} kg';
-    final farmerStr = totalYield >= 1000
-        ? '${(totalYield * 5.5 / 1000).toStringAsFixed(1)}k kg'
-        : '${(totalYield * 5.5).toStringAsFixed(0)} kg';
+  List<_AnalyticsTree> _normalizeTrees(List<Map<String, dynamic>> rawTrees) {
+    final seen = <String>{};
+    final trees = <_AnalyticsTree>[];
 
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionTitle(Icons.eco_outlined, 'Yield Overview',
-              iconColor: _green2),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                  child: _yieldBox(
-                      '🌿', 'Total Yield\n(All Trees)', totalStr, _bg)),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: _yieldBox('🌳', 'Avg Yield\nper Tree',
-                      '${avgYield.toStringAsFixed(0)} kg', _bg)),
-            ],
+    for (final raw in rawTrees) {
+      final docId = (raw[treeDocIdField] ?? '').toString().trim();
+      final treeId = (raw['treeId'] ?? '').toString().trim();
+      final key = docId.isNotEmpty ? docId : treeId;
+      if (key.isEmpty || seen.contains(key)) {
+        continue;
+      }
+      seen.add(key);
+
+      final ageYears = _asInt(raw['treeAge'] ?? raw['age']);
+      final plantedOn = _parseDate(
+            raw['plantingDate'] ?? raw['plantedOn'] ?? raw['createdAt'],
+          ) ??
+          (ageYears > 0
+              ? DateTime.now().subtract(Duration(days: ageYears * 365))
+              : null);
+
+      trees.add(
+        _AnalyticsTree(
+          treeId: treeId.isEmpty ? docId : treeId,
+          species: _speciesLabel(raw),
+          health: _statusLabel(raw['healthStatus'] ?? raw['healthStatusName']),
+          lastYieldKg: _asDouble(
+            raw['lastYieldKg'] ?? raw['yieldKg'] ?? raw['yield'],
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                  child: _yieldBox('🏆', 'Highest\nYield Tree', topTree,
-                      const Color(0xFFE8F5E9),
-                      sub: '${topYieldKg.toStringAsFixed(0)} kg',
-                      subColor: _dark)),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: _yieldBox('📊', 'Farmer\nTotal Yield', farmerStr,
-                      const Color(0xFFFFF8E1),
-                      sub: '($total trees)',
-                      subColor: const Color(0xFF9A7A35))),
-            ],
+          plantedOn: plantedOn,
+          lastActivityAt: _parseDate(
+            raw['lastinspectiondate'] ??
+                raw['lastInspectionDate'] ??
+                raw['updatedAt'] ??
+                raw['createdAt'],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _yieldBox(String emoji, String label, String value, Color bg,
-      {String? sub, Color? subColor}) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Text(emoji, style: const TextStyle(fontSize: 16)),
-            const SizedBox(width: 5),
-            Expanded(
-              child: Text(label,
-                  style: const TextStyle(
-                      fontSize: 10, color: Color(0xFF8FAF96), height: 1.3)),
-            ),
-          ]),
-          const SizedBox(height: 6),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 17, fontWeight: FontWeight.w700, color: _dark)),
-          if (sub != null) ...[
-            const SizedBox(height: 2),
-            Text(sub, style: TextStyle(fontSize: 9, color: subColor ?? _sub)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //  HEALTH DISTRIBUTION — animated donut chart
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildHealthDistCard({
-    required int total,
-    required int healthy,
-    required int unhealthy,
-    required int recovering,
-    required int todayScans,
-    required int weekScans,
-  }) {
-    final pct = total > 0 ? (healthy / total * 100).round() : 0;
-
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Health dist.',
-              style: TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w600, color: _dark)),
-          const SizedBox(height: 10),
-
-          // ── Donut chart ───────────────────────────────────────
-          Center(
-            child: AnimatedBuilder(
-              animation: _pieAnim,
-              builder: (_, __) => CustomPaint(
-                size: const Size(90, 90),
-                painter: _DonutPainter(
-                  healthy: healthy,
-                  unhealthy: unhealthy,
-                  recovering: recovering,
-                  total: total,
-                  progress: _pieAnim.value,
-                  pct: pct,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // ── Legend ────────────────────────────────────────────
-          _legend(const Color(0xFF4E9B64), 'Healthy', healthy),
-          const SizedBox(height: 4),
-          _legend(_orange, 'Unhealthy', unhealthy),
-          const SizedBox(height: 4),
-          _legend(_green4, 'Recovering', recovering),
-          const SizedBox(height: 10),
-
-          // ── Scan counts ───────────────────────────────────────
-          const Divider(height: 1, color: Color(0xFFF0F0F0)),
-          const SizedBox(height: 8),
-          _scanRow('Scans today', todayScans),
-          const SizedBox(height: 4),
-          _scanRow('Scans this week', weekScans),
-        ],
-      ),
-    );
-  }
-
-  Widget _legend(Color color, String label, int count) {
-    return Row(
-      children: [
-        Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 5),
-        Expanded(
-          child: Text(label,
-              style: const TextStyle(fontSize: 9, color: Color(0xFF4A6350))),
         ),
-        Text('$count',
-            style: const TextStyle(
-                fontSize: 9, fontWeight: FontWeight.w700, color: _dark)),
-      ],
+      );
+    }
+
+    return trees;
+  }
+
+  List<String> _speciesOptions(List<_AnalyticsTree> trees) {
+    final options = trees
+        .map((tree) => tree.species)
+        .where((species) => species.trim().isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort(
+          (left, right) => left.toLowerCase().compareTo(right.toLowerCase()));
+    return options;
+  }
+
+  List<_AnalyticsTree> _filteredTrees(List<_AnalyticsTree> trees) {
+    return trees.where((tree) {
+      if (_selectedSpecies != null && tree.species != _selectedSpecies) {
+        return false;
+      }
+      if (_selectedHealth != null && tree.health != _selectedHealth) {
+        return false;
+      }
+      return true;
+    }).toList(growable: false);
+  }
+
+  _MetricSummary _buildMetrics(List<_AnalyticsTree> trees) {
+    final totalTrees = trees.length;
+    final healthyTrees = trees.where((tree) => tree.health == 'Healthy').length;
+    final atRiskTrees = trees.where((tree) => tree.health == 'At Risk').length;
+    final totalYield = trees.fold<double>(
+        0, (runningTotal, tree) => runningTotal + tree.lastYieldKg);
+    final averageYield = totalTrees == 0 ? 0.0 : totalYield / totalTrees;
+
+    return _MetricSummary(
+      totalTreesLabel: NumberFormat.decimalPattern().format(totalTrees),
+      averageYieldLabel: '${averageYield.toStringAsFixed(1)} kg',
+      healthyTreesLabel: NumberFormat.decimalPattern().format(healthyTrees),
+      atRiskTreesLabel: NumberFormat.decimalPattern().format(atRiskTrees),
     );
   }
 
-  Widget _scanRow(String label, int value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 9, color: _sub)),
-        Text('$value',
-            style: const TextStyle(
-                fontSize: 10, fontWeight: FontWeight.w700, color: _dark)),
-      ],
+  _HealthSummary _buildHealthMetrics(List<_AnalyticsTree> trees) {
+    final sourceTrees = _healthScopedTrees(trees);
+    final total = sourceTrees.length;
+    final healthyCount =
+        sourceTrees.where((tree) => tree.health == 'Healthy').length;
+    final needsAttentionCount =
+        sourceTrees.where((tree) => tree.health == 'Needs Attention').length;
+    final atRiskCount =
+        sourceTrees.where((tree) => tree.health == 'At Risk').length;
+
+    String percentLabel(int count) {
+      if (total == 0) {
+        return '0%';
+      }
+      return '${((count / total) * 100).round()}%';
+    }
+
+    return _HealthSummary(
+      healthyCount: healthyCount,
+      needsAttentionCount: needsAttentionCount,
+      atRiskCount: atRiskCount,
+      healthyPercentLabel: percentLabel(healthyCount),
+      needsAttentionPercentLabel: percentLabel(needsAttentionCount),
+      atRiskPercentLabel: percentLabel(atRiskCount),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  AGE DISTRIBUTION — animated bar chart
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildAgeDistCard({
-    required int age0to1,
-    required int age1to5,
-    required int age5plus,
-    required int todayScans,
-    required int weekScans,
-  }) {
-    final maxAge =
-        [age0to1, age1to5, age5plus].fold(0, (m, v) => v > m ? v : m);
+  List<_AnalyticsTree> _healthScopedTrees(List<_AnalyticsTree> trees) {
+    final now = DateTime.now();
+    final dayWindow = healthMode == 'weekly' ? 7 : 30;
+    final scoped = trees.where((tree) {
+      final lastActivityAt = tree.lastActivityAt;
+      if (lastActivityAt == null || lastActivityAt.isAfter(now)) {
+        return false;
+      }
+      return now.difference(lastActivityAt).inDays < dayWindow;
+    }).toList(growable: false);
 
-    final bars = [
-      _BarData(label: '0–1', value: age0to1, maxValue: maxAge, color: _green4),
-      _BarData(label: '1–5', value: age1to5, maxValue: maxAge, color: _green3),
-      _BarData(label: '5+', value: age5plus, maxValue: maxAge, color: _green2),
-    ];
+    return scoped.isEmpty ? trees : scoped;
+  }
 
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Age dist.',
-              style: TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w600, color: _dark)),
-          const SizedBox(height: 10),
+  _TrendSeries _buildTrendSeries(List<_AnalyticsTree> trees, String range) {
+    final now = DateTime.now();
+    final dayWindow = range == 'Last 7 days' ? 7 : 30;
+    final bucketCount = range == 'Last 7 days' ? 7 : 14;
+    final bucketWidth = dayWindow / bucketCount;
+    final values = List<double>.filled(bucketCount, 0);
+    final counts = List<int>.filled(bucketCount, 0);
+    final labels = List<String>.filled(bucketCount, '');
+    final overallAverageYield = trees.isEmpty
+        ? 0.0
+        : trees.fold<double>(
+              0,
+              (runningTotal, tree) => runningTotal + tree.lastYieldKg,
+            ) /
+            trees.length;
 
-          // ── Bar chart ─────────────────────────────────────────
-          SizedBox(
-            height: 100,
-            child: AnimatedBuilder(
-              animation: _ageBarAnim,
-              builder: (_, __) => Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: bars
-                    .map((b) => Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 3),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Text('${b.value}',
-                                    style: const TextStyle(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.w600,
-                                        color: _dark)),
-                                const SizedBox(height: 2),
-                                AnimatedContainer(
-                                  duration: Duration.zero,
-                                  child: Container(
-                                    width: double.infinity,
-                                    height: b.maxValue == 0
-                                        ? 2
-                                        : (b.value / b.maxValue * 72) *
-                                            _ageBarAnim.value,
-                                    decoration: BoxDecoration(
-                                      color: b.color,
-                                      borderRadius: const BorderRadius.vertical(
-                                          top: Radius.circular(4)),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(b.label,
-                                    style: const TextStyle(
-                                        fontSize: 8, color: _sub)),
-                              ],
-                            ),
-                          ),
-                        ))
-                    .toList(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
+    for (final tree in trees) {
+      final lastActivityAt = tree.lastActivityAt;
+      if (lastActivityAt == null || lastActivityAt.isAfter(now)) {
+        continue;
+      }
+      final daysAgo = now.difference(lastActivityAt).inDays;
+      if (daysAgo < 0 || daysAgo >= dayWindow) {
+        continue;
+      }
+      final bucket = (bucketCount - 1 - (daysAgo / bucketWidth).floor())
+          .clamp(0, bucketCount - 1);
+      values[bucket] += tree.lastYieldKg;
+      counts[bucket] += 1;
+    }
 
-          const Divider(height: 1, color: Color(0xFFF0F0F0)),
-          const SizedBox(height: 8),
-          _scanRow('Scans today', todayScans),
-          const SizedBox(height: 4),
-          _scanRow('Scans this week', weekScans),
-        ],
-      ),
+    for (var i = 0; i < bucketCount; i++) {
+      if (counts[i] > 0) {
+        values[i] = values[i] / counts[i];
+      } else if (i > 0) {
+        values[i] = values[i - 1];
+      } else {
+        values[i] = overallAverageYield;
+      }
+    }
+
+    if (range == 'Last 7 days') {
+      for (var i = 0; i < bucketCount; i++) {
+        final date = now.subtract(Duration(days: bucketCount - 1 - i));
+        if (i == bucketCount - 1) {
+          labels[i] = 'Today';
+        } else if (i.isEven) {
+          labels[i] = DateFormat('E').format(date);
+        }
+      }
+    } else {
+      labels[0] = 'Week 1';
+      labels[4] = 'Week 2';
+      labels[8] = 'Week 3';
+      labels[13] = 'Today';
+    }
+
+    return _TrendSeries(values: values, bottomLabels: labels);
+  }
+
+  _ActivitySummary _buildActivityMetrics(List<_AnalyticsTree> trees) {
+    final now = DateTime.now();
+    var todayCount = 0;
+    var weekCount = 0;
+
+    for (final tree in trees) {
+      final lastActivityAt = tree.lastActivityAt;
+      if (lastActivityAt == null || lastActivityAt.isAfter(now)) {
+        continue;
+      }
+
+      if (_isSameDay(lastActivityAt, now)) {
+        todayCount += 1;
+      }
+      if (now.difference(lastActivityAt).inDays < 7) {
+        weekCount += 1;
+      }
+    }
+
+    return _ActivitySummary(todayCount: todayCount, weekCount: weekCount);
+  }
+
+  Future<void> _showRangeSheet() {
+    return _showSelectionSheet(
+      title: 'Yield range',
+      options: const ['Last 7 days', 'Last 30 days'],
+      selectedValue: selectedRange,
+      onSelected: (value) {
+        if (value == null) {
+          return;
+        }
+        setState(() => selectedRange = value);
+      },
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  WEEKLY SCAN TREND — animated bar chart
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildWeeklyTrendCard({required List<int> weekCounts}) {
-    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final maxVal = weekCounts.fold(0, (m, v) => v > m ? v : m);
-    final today = DateTime.now().weekday - 1; // 0=Mon … 6=Sun
+  Future<void> _showHealthModeSheet() {
+    return _showSelectionSheet(
+      title: 'Health distribution range',
+      options: const ['weekly', 'monthly'],
+      selectedValue: healthMode,
+      onSelected: (value) {
+        if (value == null) {
+          return;
+        }
+        setState(() => healthMode = value);
+      },
+    );
+  }
 
-    // Growth % vs previous week (simulated)
-    final thisWeek = weekCounts.fold(0, (a, b) => a + b);
-    final pctLabel = '+${(thisWeek * 0.12).round()}% this week';
+  Future<void> _showSelectionSheet({
+    required String title,
+    required List<String> options,
+    required ValueChanged<String?> onSelected,
+    String? selectedValue,
+    String? allLabel,
+  }) async {
+    const allValue = '__all__';
+    const dismissValue = '__dismiss__';
 
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final value = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Expanded(
-                child: Text('Weekly scan trend',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _dark)),
-              ),
-              Text(pctLabel,
-                  style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: _green3)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 86,
-            child: AnimatedBuilder(
-              animation: _weekBarAnim,
-              builder: (_, __) => Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(7, (i) {
-                  final val = weekCounts[i];
-                  final isToday = i == today;
-                  final barH = maxVal == 0
-                      ? 2.0
-                      : (val / maxVal * 54) * _weekBarAnim.value;
-                  final color = isToday
-                      ? _green1
-                      : val > maxVal * 0.6
-                          ? _green3
-                          : _green5;
-
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          if (isToday)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 2),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 4, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: _green1,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text('$val',
-                                    style: const TextStyle(
-                                        fontSize: 7,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700)),
-                              ),
-                            ),
-                          Container(
-                            height: barH.clamp(2.0, 54.0),
-                            decoration: BoxDecoration(
-                              color: color,
-                              borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(3)),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(days[i],
-                              style: TextStyle(
-                                  fontSize: 8,
-                                  color: isToday ? _green1 : _sub,
-                                  fontWeight: isToday
-                                      ? FontWeight.w700
-                                      : FontWeight.normal)),
-                        ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  );
-                }),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(dismissValue),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //  RFID ACTIVITY
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildRFIDActivityCard({
-    required int todayScans,
-    required int weekScans,
-  }) {
-    final activities = [
-      {'name': 'Apple Tree #12', 'time': '10 min ago'},
-      {'name': 'Orange Tree #8', 'time': '30 min ago'},
-      {'name': 'Pine Tree #25', 'time': '1 hr ago'},
-      {'name': 'Jackfruit Tree #3', 'time': 'Yesterday'},
-    ];
-
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.qr_code_scanner, color: _orange, size: 16),
-              const SizedBox(width: 7),
-              const Expanded(
-                child: Text('RFID Activity',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _dark)),
+              if (allLabel != null)
+                ListTile(
+                  title: Text(allLabel),
+                  trailing: selectedValue == null
+                      ? const Icon(Icons.check, color: Color(0xFF2E7D32))
+                      : null,
+                  onTap: () => Navigator.of(context).pop(allValue),
+                ),
+              ...options.map(
+                (option) => ListTile(
+                  title: Text(option),
+                  trailing: option == selectedValue
+                      ? const Icon(Icons.check, color: Color(0xFF2E7D32))
+                      : null,
+                  onTap: () => Navigator.of(context).pop(option),
+                ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  RichText(
-                    text: TextSpan(children: [
-                      const TextSpan(
-                          text: 'Today: ',
-                          style: TextStyle(fontSize: 9, color: _sub)),
-                      TextSpan(
-                          text: '$todayScans',
-                          style: const TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: _dark)),
-                    ]),
-                  ),
-                  RichText(
-                    text: TextSpan(children: [
-                      const TextSpan(
-                          text: 'Week: ',
-                          style: TextStyle(fontSize: 9, color: _sub)),
-                      TextSpan(
-                          text: '$weekScans',
-                          style: const TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: _dark)),
-                    ]),
-                  ),
-                ],
-              ),
+              const SizedBox(height: 8),
             ],
           ),
-          const SizedBox(height: 12),
-          ...activities.asMap().entries.map((e) {
-            final a = e.value;
-            final isOld = a['time']!.contains('Yesterday');
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF3E0),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.qr_code_scanner,
-                        color: _orange, size: 18),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(a['name']!,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: _dark)),
-                        Text(a['time']!,
-                            style: const TextStyle(fontSize: 10, color: _sub)),
-                      ],
-                    ),
-                  ),
-                  Text('${a['time']!} ›',
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: isOld ? _sub : _green3,
-                          fontWeight: FontWeight.w500)),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
+        );
+      },
     );
+
+    if (value == null || value == dismissValue) {
+      return;
+    }
+    onSelected(value == allValue ? null : value);
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  HELPERS
-  // ─────────────────────────────────────────────────────────────
-  Widget _card({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1E4D2B).withValues(alpha: 0.07),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: child,
-    );
+  String _initials(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) {
+      return 'F';
+    }
+    final parts = value.split(RegExp(r'\s+'));
+    if (parts.length == 1) {
+      return parts.first.characters.first.toUpperCase();
+    }
+    return (parts.first.characters.first + parts.last.characters.first)
+        .toUpperCase();
   }
 
-  Widget _sectionTitle(IconData icon, String title,
-      {Color iconColor = _green2}) {
-    return Row(
-      children: [
-        Icon(icon, color: iconColor, size: 16),
-        const SizedBox(width: 7),
-        Text(title,
-            style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
-      ],
-    );
+  String _speciesLabel(Map<String, dynamic> raw) {
+    final species = (raw['species'] ?? '').toString().trim();
+    if (species.isNotEmpty) {
+      return species;
+    }
+    final speciesCode = (raw['speciesCode'] ?? '').toString().trim();
+    if (speciesCode.isNotEmpty) {
+      return speciesCode;
+    }
+    return 'Unknown';
+  }
+
+  String _statusLabel(dynamic raw) {
+    final value = (raw ?? '').toString().trim().toLowerCase();
+    switch (value) {
+      case '0':
+      case 'healthy':
+        return 'Healthy';
+      case '1':
+      case 'needsattention':
+      case 'needs attention':
+        return 'Needs Attention';
+      case '2':
+      case '3':
+      case 'atrisk':
+      case 'at risk':
+      case 'sick':
+      case 'unhealthy':
+        return 'At Risk';
+      default:
+        return 'Healthy';
+    }
+  }
+
+  DateTime? _parseDate(dynamic raw) {
+    if (raw == null) {
+      return null;
+    }
+    if (raw is Timestamp) {
+      return raw.toDate();
+    }
+    if (raw is DateTime) {
+      return raw;
+    }
+    if (raw is String && raw.trim().isNotEmpty) {
+      return DateTime.tryParse(raw.trim());
+    }
+    if (raw is Map && raw['_seconds'] != null) {
+      final seconds = (raw['_seconds'] as num).toInt();
+      return DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+    }
+    return null;
+  }
+
+  int _asInt(dynamic raw) {
+    if (raw is int) {
+      return raw;
+    }
+    if (raw is num) {
+      return raw.toInt();
+    }
+    return int.tryParse((raw ?? '').toString()) ?? 0;
+  }
+
+  double _asDouble(dynamic raw) {
+    if (raw is double) {
+      return raw;
+    }
+    if (raw is num) {
+      return raw.toDouble();
+    }
+    return double.tryParse((raw ?? '').toString()) ?? 0;
+  }
+
+  bool _isSameDay(DateTime left, DateTime right) {
+    return left.year == right.year &&
+        left.month == right.month &&
+        left.day == right.day;
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  DONUT CHART PAINTER
-// ─────────────────────────────────────────────────────────────
-class _DonutPainter extends CustomPainter {
-  final int healthy;
-  final int unhealthy;
-  final int recovering;
-  final int total;
-  final double progress; // 0.0 → 1.0 (animation)
-  final int pct;
-
-  _DonutPainter({
-    required this.healthy,
-    required this.unhealthy,
-    required this.recovering,
-    required this.total,
-    required this.progress,
-    required this.pct,
+class _AnalyticsTree {
+  const _AnalyticsTree({
+    required this.treeId,
+    required this.species,
+    required this.health,
+    required this.lastYieldKg,
+    required this.plantedOn,
+    required this.lastActivityAt,
   });
+
+  final String treeId;
+  final String species;
+  final String health;
+  final double lastYieldKg;
+  final DateTime? plantedOn;
+  final DateTime? lastActivityAt;
+}
+
+class _MetricSummary {
+  const _MetricSummary({
+    required this.totalTreesLabel,
+    required this.averageYieldLabel,
+    required this.healthyTreesLabel,
+    required this.atRiskTreesLabel,
+  });
+
+  final String totalTreesLabel;
+  final String averageYieldLabel;
+  final String healthyTreesLabel;
+  final String atRiskTreesLabel;
+}
+
+class _HealthSummary {
+  const _HealthSummary({
+    required this.healthyCount,
+    required this.needsAttentionCount,
+    required this.atRiskCount,
+    required this.healthyPercentLabel,
+    required this.needsAttentionPercentLabel,
+    required this.atRiskPercentLabel,
+  });
+
+  final int healthyCount;
+  final int needsAttentionCount;
+  final int atRiskCount;
+  final String healthyPercentLabel;
+  final String needsAttentionPercentLabel;
+  final String atRiskPercentLabel;
+}
+
+class _TrendSeries {
+  const _TrendSeries({
+    required this.values,
+    required this.bottomLabels,
+  });
+
+  final List<double> values;
+  final List<String> bottomLabels;
+}
+
+class _ActivitySummary {
+  const _ActivitySummary({
+    required this.todayCount,
+    required this.weekCount,
+  });
+
+  final int todayCount;
+  final int weekCount;
+}
+
+class _PieSection {
+  const _PieSection({
+    required this.value,
+    required this.color,
+  });
+
+  final double value;
+  final Color color;
+}
+
+class _PieChartPainter extends CustomPainter {
+  const _PieChartPainter({required this.sections});
+
+  final List<_PieSection> sections;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final radius = math.min(cx, cy) - 2;
-    const stroke = 22.0;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2;
+    final total = sections.fold<double>(
+      0,
+      (runningTotal, section) => runningTotal + section.value,
+    );
 
-    final rect = Rect.fromCircle(center: Offset(cx, cy), radius: radius);
-
-    // Proportions
-    final tot = total == 0 ? 1 : total;
-    final hAngle = (healthy / tot) * 2 * math.pi * progress;
-    final uAngle = (unhealthy / tot) * 2 * math.pi * progress;
-    final rAngle = (recovering / tot) * 2 * math.pi * progress;
-
-    // Background ring (grey when nothing)
-    if (total == 0) {
-      final bgPaint = Paint()
-        ..color = Colors.grey.shade200
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke;
-      canvas.drawCircle(Offset(cx, cy), radius, bgPaint);
+    if (total <= 0) {
+      final paint = Paint()..color = Colors.grey.shade300;
+      canvas.drawCircle(center, radius, paint);
+      return;
     }
 
-    // Draw each arc segment
-    double startAngle = -math.pi / 2;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    var startAngle = -math.pi / 2;
 
-    void drawArc(double sweep, Color color) {
-      if (sweep <= 0) return;
-      final paint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
-        ..strokeCap = StrokeCap.butt;
-      canvas.drawArc(rect, startAngle, sweep - 0.04, false, paint);
-      startAngle += sweep;
+    for (final section in sections) {
+      final sweepAngle = (section.value / total) * math.pi * 2;
+      final path = Path()
+        ..moveTo(center.dx, center.dy)
+        ..arcTo(rect, startAngle, sweepAngle, false)
+        ..close();
+
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = section.color
+          ..style = PaintingStyle.fill,
+      );
+
+      startAngle += sweepAngle;
     }
 
-    drawArc(hAngle, const Color(0xFF4E9B64));
-    drawArc(uAngle, const Color(0xFFE07B2A));
-    drawArc(rAngle, const Color(0xFFA5D6A7));
-
-    // Centre hole fill
-    final holePaint = Paint()
-      ..color = const Color(0xFFF7F5F0)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(cx, cy), radius - stroke / 2, holePaint);
-
-    // Centre text
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: total == 0 ? '0%' : '$pct%',
-        style: const TextStyle(
-          color: Color(0xFF1A2E1C),
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    textPainter.paint(
-      canvas,
-      Offset(cx - textPainter.width / 2, cy - textPainter.height / 2),
+    canvas.drawCircle(
+      center,
+      6,
+      Paint()..color = Colors.white.withValues(alpha: 0.85),
     );
   }
 
   @override
-  bool shouldRepaint(_DonutPainter old) =>
-      old.progress != progress ||
-      old.healthy != healthy ||
-      old.unhealthy != unhealthy ||
-      old.recovering != recovering;
+  bool shouldRepaint(covariant _PieChartPainter oldDelegate) => true;
 }
 
-// ─────────────────────────────────────────────────────────────
-//  BAR DATA MODEL
-// ─────────────────────────────────────────────────────────────
-class _BarData {
-  final String label;
-  final int value;
-  final int maxValue;
-  final Color color;
-  const _BarData({
-    required this.label,
-    required this.value,
-    required this.maxValue,
-    required this.color,
+class _LineChartPainter extends CustomPainter {
+  const _LineChartPainter({
+    required this.values,
+    required this.bottomLabels,
   });
+
+  final List<double> values;
+  final List<String> bottomLabels;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const leftPadding = 34.0;
+    const rightPadding = 12.0;
+    const topPadding = 12.0;
+    const bottomPadding = 30.0;
+
+    final chartRect = Rect.fromLTWH(
+      leftPadding,
+      topPadding,
+      size.width - leftPadding - rightPadding,
+      size.height - topPadding - bottomPadding,
+    );
+
+    if (chartRect.width <= 0 || chartRect.height <= 0) {
+      return;
+    }
+
+    final safeValues = values.isEmpty ? <double>[0, 0] : values;
+    var minValue = safeValues.reduce(math.min);
+    var maxValue = safeValues.reduce(math.max);
+
+    if (minValue == maxValue) {
+      if (maxValue == 0) {
+        maxValue = 10;
+      } else {
+        minValue = math.max(0, minValue * 0.8);
+        maxValue = maxValue * 1.2;
+      }
+    } else {
+      final padding = (maxValue - minValue) * 0.15;
+      minValue = math.max(0, minValue - padding);
+      maxValue = maxValue + padding;
+    }
+
+    final gridPaint = Paint()
+      ..color = Colors.grey.shade300
+      ..strokeWidth = 1;
+    final axisTextStyle = TextStyle(
+      color: Colors.grey.shade700,
+      fontSize: 10,
+    );
+
+    for (var i = 0; i < 4; i++) {
+      final y = chartRect.top + (chartRect.height * i / 3);
+      canvas.drawLine(
+        Offset(chartRect.left, y),
+        Offset(chartRect.right, y),
+        gridPaint,
+      );
+
+      final labelValue = maxValue - ((maxValue - minValue) * i / 3);
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: labelValue.toStringAsFixed(0),
+          style: axisTextStyle,
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      textPainter.paint(
+        canvas,
+        Offset(
+          chartRect.left - textPainter.width - 8,
+          y - (textPainter.height / 2),
+        ),
+      );
+    }
+
+    final points = <Offset>[];
+    final stepX = safeValues.length <= 1
+        ? 0.0
+        : chartRect.width / (safeValues.length - 1);
+
+    for (var i = 0; i < safeValues.length; i++) {
+      final normalizedY =
+          (safeValues[i] - minValue) / math.max(maxValue - minValue, 0.001);
+      points.add(
+        Offset(
+          chartRect.left + (stepX * i),
+          chartRect.bottom - (normalizedY * chartRect.height),
+        ),
+      );
+    }
+
+    final linePath = Path()..moveTo(points.first.dx, points.first.dy);
+    for (var i = 0; i < points.length - 1; i++) {
+      final current = points[i];
+      final next = points[i + 1];
+      final midpoint = Offset(
+        (current.dx + next.dx) / 2,
+        (current.dy + next.dy) / 2,
+      );
+      linePath.quadraticBezierTo(
+        current.dx,
+        current.dy,
+        midpoint.dx,
+        midpoint.dy,
+      );
+    }
+    linePath.lineTo(points.last.dx, points.last.dy);
+
+    final areaPath = Path.from(linePath)
+      ..lineTo(points.last.dx, chartRect.bottom)
+      ..lineTo(points.first.dx, chartRect.bottom)
+      ..close();
+
+    canvas.drawPath(
+      areaPath,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [
+            Colors.blue.withValues(alpha: 0.25),
+            Colors.transparent,
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ).createShader(chartRect),
+    );
+
+    canvas.drawPath(
+      linePath,
+      Paint()
+        ..color = Colors.blue
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke,
+    );
+
+    for (final point in points) {
+      canvas.drawCircle(
+        point,
+        4,
+        Paint()..color = Colors.white,
+      );
+      canvas.drawCircle(
+        point,
+        3,
+        Paint()..color = Colors.blue,
+      );
+    }
+
+    for (var i = 0; i < bottomLabels.length && i < points.length; i++) {
+      final label = bottomLabels[i];
+      if (label.isEmpty) {
+        continue;
+      }
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            color: Colors.grey.shade700,
+            fontSize: 10,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: 52);
+      textPainter.paint(
+        canvas,
+        Offset(
+          points[i].dx - (textPainter.width / 2),
+          chartRect.bottom + 8,
+        ),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LineChartPainter oldDelegate) => true;
 }

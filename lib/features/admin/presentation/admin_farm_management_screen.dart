@@ -6,6 +6,7 @@ import '../../farm_manager/presentation/farm_manager_providers.dart';
 import 'admin_farm_detail_screen.dart';
 import 'admin_management_forms.dart';
 import 'admin_management_service.dart';
+import 'admin_tree_management_screen.dart';
 
 class AdminFarmManagementScreen extends ConsumerStatefulWidget {
   const AdminFarmManagementScreen({super.key});
@@ -71,6 +72,14 @@ class _AdminFarmManagementScreenState
     );
   }
 
+  void _openTrees() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const AdminTreeManagementScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final overviewAsync = ref.watch(globalFarmOverviewProvider);
@@ -92,7 +101,6 @@ class _AdminFarmManagementScreenState
           data: (overview) {
             final farms = overview.farms;
             final treeDocs = overview.treeDocs;
-            final scopedTrees = overview.scopedTrees;
             final issues = overview.issues;
             final filteredFarms = farms.where((farm) {
               final query = _search.trim().toLowerCase();
@@ -100,8 +108,7 @@ class _AdminFarmManagementScreenState
                 return true;
               }
               return farm.name.toLowerCase().contains(query) ||
-                  farm.location.toLowerCase().contains(query) ||
-                  farm.farmerName.toLowerCase().contains(query);
+                  farm.location.toLowerCase().contains(query);
             }).toList(growable: false);
             final averageHealth = farms.isEmpty
                 ? 0
@@ -113,7 +120,20 @@ class _AdminFarmManagementScreenState
 
             return Column(
               children: [
-                const _FarmManagementHeader(),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Farm Management',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E5631),
+                      ),
+                    ),
+                  ),
+                ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                   child: TextField(
@@ -124,7 +144,7 @@ class _AdminFarmManagementScreenState
                       });
                     },
                     decoration: InputDecoration(
-                      hintText: 'Search farms, locations, or farmer names',
+                      hintText: 'Search farms or locations',
                       prefixIcon: const Icon(Icons.search),
                       filled: true,
                       fillColor: Colors.white,
@@ -154,6 +174,7 @@ class _AdminFarmManagementScreenState
                           value: '${treeDocs.length}',
                           subtitle: 'Across every farm',
                           color: Colors.green.shade700,
+                          onTap: _openTrees,
                         ),
                       ),
                     ],
@@ -165,9 +186,9 @@ class _AdminFarmManagementScreenState
                     children: [
                       Expanded(
                         child: _SummaryCard(
-                          title: 'Farmers',
-                          value: '${uniqueFarmerCount(scopedTrees)}',
-                          subtitle: 'Avg health $averageHealth%',
+                          title: 'Health',
+                          value: '$averageHealth%',
+                          subtitle: 'Average farm health',
                           color: Colors.teal.shade700,
                         ),
                       ),
@@ -256,103 +277,72 @@ class _AdminFarmManagementScreenState
   }
 }
 
-class _FarmManagementHeader extends StatelessWidget {
-  const _FarmManagementHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-      decoration: BoxDecoration(color: Colors.green.shade800),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const SizedBox(width: 40),
-          const Text(
-            'Farm Management',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          Container(
-            decoration: const BoxDecoration(
-              color: Colors.white24,
-              shape: BoxShape.circle,
-            ),
-            child: const Padding(
-              padding: EdgeInsets.all(10),
-              child: Icon(
-                Icons.agriculture_outlined,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
     required this.title,
     required this.value,
     required this.subtitle,
     required this.color,
+    this.onTap,
   });
 
   final String title;
   final String value;
   final String subtitle;
   final Color color;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1A000000),
-            blurRadius: 6,
-            offset: Offset(0, 2),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1A000000),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E5631),
-            ),
+          child: Column(
+            children: [
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E5631),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.black54,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.black54,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -421,10 +411,6 @@ class _FarmTile extends StatelessWidget {
                       _InfoChip(
                         label: '${farm.totalTrees} trees',
                         color: Colors.green.shade700,
-                      ),
-                      _InfoChip(
-                        label: farm.farmerName,
-                        color: Colors.teal.shade700,
                       ),
                       _InfoChip(
                         label: '${farm.alertCount} alerts',

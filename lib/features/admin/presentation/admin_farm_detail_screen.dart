@@ -350,22 +350,6 @@ class _AdminFarmDetailScreenState extends ConsumerState<AdminFarmDetailScreen> {
                         : '${currentFarm.areaAcres} acres',
                   ),
                   _DetailRow(
-                    label: 'Farmer',
-                    value: currentFarm.farmerName,
-                  ),
-                  _DetailRow(
-                    label: 'Phone',
-                    value: currentFarm.farmerPhone.isEmpty
-                        ? '-'
-                        : currentFarm.farmerPhone,
-                  ),
-                  _DetailRow(
-                    label: 'Email',
-                    value: currentFarm.farmerEmail.isEmpty
-                        ? '-'
-                        : currentFarm.farmerEmail,
-                  ),
-                  _DetailRow(
                     label: 'Farm ID',
                     value: currentFarm.id,
                   ),
