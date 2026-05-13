@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router/route_paths.dart';
+import '../../../core/localization/app_language.dart';
+import '../../../shared/widgets/responsive_layout.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -138,192 +140,214 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
+    final cardPadding = ResponsiveLayout.adaptiveSpace(
+      context,
+      min: 14,
+      max: 20,
+    );
+    final headingSize = ResponsiveLayout.fontSize(context, 22);
 
     return Scaffold(
       backgroundColor: Colors.grey[200],
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-              const Text(
-                'Create Account',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
+      body: ResponsiveScrollBody(
+        maxWidth: 420,
+        fillViewport: true,
+        padding: ResponsiveLayout.pageInsets(
+          context,
+          top: 20,
+          bottom: 24,
+          compact: 18,
+          regular: 24,
+          wide: 28,
+        ),
+        child: Column(
+          children: [
+            SizedBox(height: ResponsiveLayout.adaptiveSpace(context, min: 12)),
+            Text(
+              context.tr('Create Account'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: headingSize,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Create an account with email and password.',
-                style: TextStyle(color: Colors.black54),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              context.tr('Create an account with email and password.'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.black54),
+            ),
+            SizedBox(height: ResponsiveLayout.adaptiveSpace(context, min: 18)),
+            Container(
+              padding: EdgeInsets.all(cardPadding),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black12, blurRadius: 6),
+                ],
               ),
-              const SizedBox(height: 25),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black12, blurRadius: 6),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    _inputField(nameController, 'Full Name'),
-                    const SizedBox(height: 15),
-                    _inputField(
-                      phoneController,
-                      'Phone Number',
-                      keyboardType: TextInputType.phone,
-                      errorText: phoneError,
-                    ),
-                    if (role == 'farmer') ...[
-                      const SizedBox(height: 15),
-                      _inputField(
-                        farmManagerCodeController,
-                        'Farm Manager Code (Optional)',
-                        errorText: farmManagerCodeError,
-                        keyboardType: TextInputType.text,
-                      ),
-                      const SizedBox(height: 8),
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Add a farm manager code only if you want to work under that manager.',
-                          style: TextStyle(
-                            color: Colors.black54,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 15),
-                    _inputField(
-                      emailController,
-                      'Email Address',
-                      keyboardType: TextInputType.emailAddress,
-                      errorText: emailError,
-                    ),
-                    const SizedBox(height: 15),
-                    _inputField(
-                      passwordController,
-                      'Password',
-                      isPassword: true,
-                      obscure: obscurePassword,
-                      onToggle: () => setState(
-                        () => obscurePassword = !obscurePassword,
-                      ),
-                      errorText: passwordError,
-                    ),
-                    const SizedBox(height: 15),
-                    _inputField(
-                      confirmPasswordController,
-                      'Confirm Password',
-                      isPassword: true,
-                      obscure: obscureConfirm,
-                      onToggle: () => setState(
-                        () => obscureConfirm = !obscureConfirm,
-                      ),
-                      errorText: confirmError,
-                    ),
-                    const SizedBox(height: 15),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: DropdownButton<String>(
-                        value: role,
-                        isExpanded: true,
-                        underline: const SizedBox(),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'farmer',
-                            child: Text('Farmer'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'farm_manager',
-                            child: Text('Farm Manager'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'kvk',
-                            child: Text('KVK'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'admin',
-                            child: Text('Admin'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            role = value!;
-                            farmManagerCodeError = null;
-                            if (role != 'farmer') {
-                              farmManagerCodeController.clear();
-                            }
-                          });
-                        },
-                      ),
-                    ),
-                    if (role == 'farm_manager') ...[
-                      const SizedBox(height: 12),
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Your farm manager code will be generated automatically after registration.',
-                          style: TextStyle(
-                            color: Colors.black54,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 25),
-              authState.isLoading
-                  ? const CircularProgressIndicator()
-                  : SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green[700],
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                        onPressed: _register,
-                        child: const Text(
-                          'SIGN UP',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Column(
                 children: [
-                  const Text('Already have an account? '),
-                  GestureDetector(
-                    onTap: () => context.go('/login'),
-                    child: const Text(
-                      'LOGIN',
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontWeight: FontWeight.bold,
+                  _inputField(nameController, context.tr('Full Name')),
+                  const SizedBox(height: 15),
+                  _inputField(
+                    phoneController,
+                    context.tr('Phone Number'),
+                    keyboardType: TextInputType.phone,
+                    errorText: phoneError,
+                  ),
+                  if (role == 'farmer') ...[
+                    const SizedBox(height: 15),
+                    _inputField(
+                      farmManagerCodeController,
+                      context.tr('Farm Manager Code (Optional)'),
+                      errorText: farmManagerCodeError,
+                      keyboardType: TextInputType.text,
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        context.tr(
+                          'Add a farm manager code only if you want to work under that manager.',
+                        ),
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 15),
+                  _inputField(
+                    emailController,
+                    context.tr('Email Address'),
+                    keyboardType: TextInputType.emailAddress,
+                    errorText: emailError,
+                  ),
+                  const SizedBox(height: 15),
+                  _inputField(
+                    passwordController,
+                    context.tr('Password'),
+                    isPassword: true,
+                    obscure: obscurePassword,
+                    onToggle: () => setState(
+                      () => obscurePassword = !obscurePassword,
+                    ),
+                    errorText: passwordError,
+                  ),
+                  const SizedBox(height: 15),
+                  _inputField(
+                    confirmPasswordController,
+                    context.tr('Confirm Password'),
+                    isPassword: true,
+                    obscure: obscureConfirm,
+                    onToggle: () => setState(
+                      () => obscureConfirm = !obscureConfirm,
+                    ),
+                    errorText: confirmError,
+                  ),
+                  const SizedBox(height: 15),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButton<String>(
+                      value: role,
+                      isExpanded: true,
+                      underline: const SizedBox(),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'farmer',
+                          child: Text(context.tr('Farmer')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'farm_manager',
+                          child: Text(context.tr('Farm Manager')),
+                        ),
+                        const DropdownMenuItem(
+                          value: 'kvk',
+                          child: Text('KVK'),
+                        ),
+                        const DropdownMenuItem(
+                          value: 'admin',
+                          child: Text('Admin'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          role = value!;
+                          farmManagerCodeError = null;
+                          if (role != 'farmer') {
+                            farmManagerCodeController.clear();
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  if (role == 'farm_manager') ...[
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        context.tr(
+                          'Your farm manager code will be generated automatically after registration.',
+                        ),
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            SizedBox(height: ResponsiveLayout.adaptiveSpace(context, min: 18)),
+            authState.isLoading
+                ? const CircularProgressIndicator()
+                : SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green[700],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      onPressed: _register,
+                      child: Text(
+                        context.tr('SIGN UP'),
+                        style: const TextStyle(color: Colors.white),
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
+            SizedBox(height: ResponsiveLayout.adaptiveSpace(context, min: 16)),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                Text(context.tr('Already have an account? ')),
+                GestureDetector(
+                  onTap: () => context.go('/login'),
+                  child: Text(
+                    context.tr('LOGIN'),
+                    style: const TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

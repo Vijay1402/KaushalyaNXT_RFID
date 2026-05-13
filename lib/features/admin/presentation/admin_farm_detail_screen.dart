@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/widgets/responsive_layout.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
 import '../../farm_manager/presentation/farm_manager_providers.dart';
 import 'admin_management_forms.dart';
@@ -188,6 +189,7 @@ class _AdminFarmDetailScreenState extends ConsumerState<AdminFarmDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final overviewAsync = ref.watch(globalFarmOverviewProvider);
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F2),
@@ -237,7 +239,7 @@ class _AdminFarmDetailScreenState extends ConsumerState<AdminFarmDetailScreen> {
             });
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(horizontalPadding),
             children: [
               Container(
                 padding: const EdgeInsets.all(18),
@@ -299,28 +301,26 @@ class _AdminFarmDetailScreenState extends ConsumerState<AdminFarmDetailScreen> {
                   child: LinearProgressIndicator(),
                 ),
               const SizedBox(height: 16),
-              Row(
+              ResponsiveWrapGrid(
+                minChildWidth: 150,
+                maxColumns: 2,
+                spacing: 10,
+                runSpacing: 10,
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed:
-                          _isWorking ? null : () => _editFarm(currentFarm!),
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Edit Farm'),
-                    ),
+                  OutlinedButton.icon(
+                    onPressed:
+                        _isWorking ? null : () => _editFarm(currentFarm!),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit Farm'),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed:
-                          _isWorking ? null : () => _addTree(currentFarm!),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
-                        foregroundColor: Colors.white,
-                      ),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Tree'),
+                  ElevatedButton.icon(
+                    onPressed: _isWorking ? null : () => _addTree(currentFarm!),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      foregroundColor: Colors.white,
                     ),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Tree'),
                   ),
                 ],
               ),
@@ -351,7 +351,7 @@ class _AdminFarmDetailScreenState extends ConsumerState<AdminFarmDetailScreen> {
                   ),
                   _DetailRow(
                     label: 'Farm ID',
-                    value: currentFarm.id,
+                    value: _displayFarmId(currentFarm),
                   ),
                 ],
               ),
@@ -399,6 +399,32 @@ class _AdminFarmDetailScreenState extends ConsumerState<AdminFarmDetailScreen> {
 
   String _errorMessage(Object error) {
     return error.toString().replaceFirst('Exception: ', '').trim();
+  }
+
+  String _displayFarmId(FarmManagerFarm farm) {
+    final explicitTreeFarmId = firstNonEmptyString(
+      farm.trees
+          .expand((tree) => [tree['farmId'], tree['assignedFarmId']])
+          .toList(),
+    );
+    if (explicitTreeFarmId.isNotEmpty) {
+      return _farmIdOnly(explicitTreeFarmId);
+    }
+
+    return _farmIdOnly(farm.id);
+  }
+
+  String _farmIdOnly(String value) {
+    final parts = value
+        .split('|')
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList(growable: false);
+    if (parts.isEmpty) {
+      return 'Not set';
+    }
+
+    return parts.last;
   }
 }
 
@@ -448,6 +474,31 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context, breakpoint: 340);
+
+    if (isCompact) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../shared/widgets/responsive_layout.dart';
+
 class LocalStorageViewerScreen extends StatefulWidget {
   const LocalStorageViewerScreen({super.key});
 
@@ -100,7 +102,10 @@ class _LocalStorageViewerScreenState extends State<LocalStorageViewerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Local Storage'),
+        title: const Text(
+          'Local Storage',
+          overflow: TextOverflow.ellipsis,
+        ),
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
         actions: [
@@ -129,32 +134,32 @@ class _LocalStorageViewerScreenState extends State<LocalStorageViewerScreen> {
 
           final data = snapshot.data!;
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: ResponsiveLayout.pageInsets(
+              context,
+              top: 16,
+              bottom: 24,
+            ),
             children: [
-              Row(
+              ResponsiveWrapGrid(
+                minChildWidth: 150,
+                maxColumns: 3,
+                spacing: 12,
+                runSpacing: 12,
                 children: [
-                  Expanded(
-                    child: _summaryCard(
-                      icon: Icons.park_outlined,
-                      label: 'Trees',
-                      value: '${data.trees.length}',
-                    ),
+                  _summaryCard(
+                    icon: Icons.park_outlined,
+                    label: 'Trees',
+                    value: '${data.trees.length}',
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _summaryCard(
-                      icon: Icons.nfc_outlined,
-                      label: 'Written Tags',
-                      value: '${data.writtenTags.length}',
-                    ),
+                  _summaryCard(
+                    icon: Icons.nfc_outlined,
+                    label: 'Written Tags',
+                    value: '${data.writtenTags.length}',
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _summaryCard(
-                      icon: Icons.storage_outlined,
-                      label: 'Other Keys',
-                      value: '${data.others.length}',
-                    ),
+                  _summaryCard(
+                    icon: Icons.storage_outlined,
+                    label: 'Other Keys',
+                    value: '${data.others.length}',
                   ),
                 ],
               ),
@@ -342,26 +347,38 @@ class _LocalStorageViewerScreenState extends State<LocalStorageViewerScreen> {
   }
 
   Widget _row(String label, dynamic value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 90,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 260;
+        final labelText = Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey.shade700,
+            fontWeight: FontWeight.w600,
           ),
-          Expanded(
-            child: Text(_displayValue(value)),
-          ),
-        ],
-      ),
+        );
+        final valueText = Text(_displayValue(value));
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    labelText,
+                    const SizedBox(height: 2),
+                    valueText,
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(width: 90, child: labelText),
+                    Expanded(child: valueText),
+                  ],
+                ),
+        );
+      },
     );
   }
 }

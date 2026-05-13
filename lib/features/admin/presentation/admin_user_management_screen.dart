@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/firebase_providers.dart';
+import '../../../shared/widgets/responsive_layout.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class AdminUserManagementScreen extends ConsumerStatefulWidget {
@@ -220,6 +221,7 @@ class _AdminUserManagementScreenState
   Widget build(BuildContext context) {
     final currentUserId = ref.read(authServiceProvider).getCurrentUser()?.uid;
     final usersAsync = ref.watch(usersSnapshotsProvider);
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F1),
@@ -251,7 +253,12 @@ class _AdminUserManagementScreenState
                       : null,
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    14,
+                    horizontalPadding,
+                    0,
+                  ),
                   child: TextField(
                     controller: _searchController,
                     onChanged: (value) {
@@ -272,53 +279,48 @@ class _AdminUserManagementScreenState
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Column(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    12,
+                    horizontalPadding,
+                    0,
+                  ),
+                  child: ResponsiveWrapGrid(
+                    minChildWidth: 140,
+                    maxColumns: 2,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _MetricCard(
-                              title: 'Total Users',
-                              value: '${counts.total}',
-                              icon: Icons.groups_2_outlined,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _MetricCard(
-                              title: 'Admins',
-                              value: '${counts.admins}',
-                              icon: Icons.admin_panel_settings_outlined,
-                            ),
-                          ),
-                        ],
+                      _MetricCard(
+                        title: 'Total Users',
+                        value: '${counts.total}',
+                        icon: Icons.groups_2_outlined,
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _MetricCard(
-                              title: 'Farm Managers',
-                              value: '${counts.managers}',
-                              icon: Icons.badge_outlined,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _MetricCard(
-                              title: 'Farmers',
-                              value: '${counts.farmers}',
-                              icon: Icons.agriculture_outlined,
-                            ),
-                          ),
-                        ],
+                      _MetricCard(
+                        title: 'Admins',
+                        value: '${counts.admins}',
+                        icon: Icons.admin_panel_settings_outlined,
+                      ),
+                      _MetricCard(
+                        title: 'Farm Managers',
+                        value: '${counts.managers}',
+                        icon: Icons.badge_outlined,
+                      ),
+                      _MetricCard(
+                        title: 'Farmers',
+                        value: '${counts.farmers}',
+                        icon: Icons.agriculture_outlined,
                       ),
                     ],
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    12,
+                    horizontalPadding,
+                    0,
+                  ),
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
@@ -338,7 +340,12 @@ class _AdminUserManagementScreenState
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    12,
+                    horizontalPadding,
+                    0,
+                  ),
                   child: SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -366,7 +373,12 @@ class _AdminUserManagementScreenState
                 const SizedBox(height: 12),
                 Expanded(
                   child: Container(
-                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    margin: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      0,
+                      horizontalPadding,
+                      16,
+                    ),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -381,26 +393,55 @@ class _AdminUserManagementScreenState
                     ),
                     child: Column(
                       children: [
-                        Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'User Directory',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1D2B1F),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isCompact = constraints.maxWidth < 280;
+                            if (!isCompact) {
+                              return Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      'User Directory',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1D2B1F),
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${filteredUsers.length} shown',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade700,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'User Directory',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1D2B1F),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            Text(
-                              '${filteredUsers.length} shown',
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${filteredUsers.length} shown',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                         const SizedBox(height: 12),
                         Expanded(
@@ -592,6 +633,8 @@ class _UserTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context, breakpoint: 360);
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -610,6 +653,7 @@ class _UserTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
                   backgroundColor:
@@ -627,10 +671,11 @@ class _UserTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
+                      if (isCompact)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
                               isCurrentUser
                                   ? 'Current Account'
                                   : '${_roleLabel(user.role)} Account',
@@ -640,28 +685,65 @@ class _UserTile extends StatelessWidget {
                                 color: Color(0xFF1D2B1F),
                               ),
                             ),
-                          ),
-                          if (isCurrentUser)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
+                            if (isCurrentUser) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE6F5E6),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: const Text(
+                                  'You',
+                                  style: TextStyle(
+                                    color: Color(0xFF2E8933),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11,
+                                  ),
+                                ),
                               ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE6F5E6),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: const Text(
-                                'You',
-                                style: TextStyle(
-                                  color: Color(0xFF2E8933),
+                            ],
+                          ],
+                        )
+                      else
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                isCurrentUser
+                                    ? 'Current Account'
+                                    : '${_roleLabel(user.role)} Account',
+                                style: const TextStyle(
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 11,
+                                  color: Color(0xFF1D2B1F),
                                 ),
                               ),
                             ),
-                        ],
-                      ),
+                            if (isCurrentUser)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE6F5E6),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: const Text(
+                                  'You',
+                                  style: TextStyle(
+                                    color: Color(0xFF2E8933),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       const SizedBox(height: 4),
                       Text(
                         isCurrentUser
@@ -672,13 +754,14 @@ class _UserTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(
-                  isCurrentUser
-                      ? Icons.arrow_forward_ios_rounded
-                      : Icons.edit_outlined,
-                  size: 18,
-                  color: Colors.grey.shade700,
-                ),
+                if (!isCompact)
+                  Icon(
+                    isCurrentUser
+                        ? Icons.arrow_forward_ios_rounded
+                        : Icons.edit_outlined,
+                    size: 18,
+                    color: Colors.grey.shade700,
+                  ),
               ],
             ),
             const SizedBox(height: 12),

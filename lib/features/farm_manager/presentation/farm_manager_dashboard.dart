@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router/route_paths.dart';
+import '../../../core/localization/app_language.dart';
+import '../../../shared/widgets/responsive_layout.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'farm_manager_data.dart';
 import 'farm_manager_providers.dart';
@@ -57,6 +59,7 @@ class FarmManagerDashboard extends ConsumerWidget {
             final scopedTrees = overview.scopedTrees;
             final farms = overview.farms;
             final issues = overview.issues;
+            final horizontalPadding = ResponsiveLayout.pagePadding(context);
             final healthyTrees = scopedTrees
                 .where((tree) => healthLabel(tree['healthStatus']) == 'Healthy')
                 .length;
@@ -85,7 +88,12 @@ class FarmManagerDashboard extends ConsumerWidget {
               children: [
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      16,
+                      horizontalPadding,
+                      24,
+                    ),
                     children: [
                       _WelcomeBanner(
                         managerName: name,
@@ -94,30 +102,28 @@ class FarmManagerDashboard extends ConsumerWidget {
                         },
                       ),
                       const SizedBox(height: 18),
-                      Row(
+                      ResponsiveWrapGrid(
+                        minChildWidth: 160,
+                        maxColumns: 2,
+                        spacing: 14,
                         children: [
-                          Expanded(
-                            child: _DashboardCountCard(
-                              title: 'Total Managed Farms',
-                              value: '${farms.length}',
-                              onTap: () {
-                                context.push(
-                                  RoutePaths.farmManagerFarms,
-                                );
-                              },
-                            ),
+                          _DashboardCountCard(
+                            title: context.tr('Total Managed Farms'),
+                            value: '${farms.length}',
+                            onTap: () {
+                              context.push(
+                                RoutePaths.farmManagerFarms,
+                              );
+                            },
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: _DashboardCountCard(
-                              title: 'Total Trees',
-                              value: '${scopedTrees.length}',
-                              onTap: () {
-                                context.push(
-                                  RoutePaths.farmManagerTrees,
-                                );
-                              },
-                            ),
+                          _DashboardCountCard(
+                            title: context.tr('totalTrees'),
+                            value: '${scopedTrees.length}',
+                            onTap: () {
+                              context.push(
+                                RoutePaths.farmManagerTrees,
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -142,32 +148,30 @@ class FarmManagerDashboard extends ConsumerWidget {
                         },
                       ),
                       const SizedBox(height: 18),
-                      Row(
+                      ResponsiveWrapGrid(
+                        minChildWidth: 160,
+                        maxColumns: 2,
+                        spacing: 14,
                         children: [
-                          Expanded(
-                            child: _DashboardCountCard(
-                              title: 'Total Issues',
-                              value: '${issues.length}',
-                              onTap: () {
-                                context.push(
-                                  RoutePaths.farmManagerIssues,
-                                );
-                              },
-                            ),
+                          _DashboardCountCard(
+                            title: context.tr('Total Issues'),
+                            value: '${issues.length}',
+                            onTap: () {
+                              context.push(
+                                RoutePaths.farmManagerIssues,
+                              );
+                            },
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: _DashboardCountCard(
-                              title: 'Critical',
-                              value: '$criticalIssues',
-                              onTap: () {
-                                context.push(
-                                  _issueTrackerLocation(
-                                    severity: 'Critical',
-                                  ),
-                                );
-                              },
-                            ),
+                          _DashboardCountCard(
+                            title: context.tr('Critical'),
+                            value: '$criticalIssues',
+                            onTap: () {
+                              context.push(
+                                _issueTrackerLocation(
+                                  severity: 'Critical',
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -238,7 +242,7 @@ class FarmManagerDashboard extends ConsumerWidget {
                     context.push('/scan');
                   },
                   onAnalyticsTap: () {
-                    context.push(RoutePaths.farmManagerAnalytics);
+                    context.go(RoutePaths.farmManagerAnalytics);
                   },
                   onProfileTap: () {
                     context.push('/profile');
@@ -277,53 +281,83 @@ class _WelcomeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context);
+    final avatarSize = isCompact ? 60.0 : 70.0;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       decoration: BoxDecoration(
         color: const Color(0xFF2E8933),
         borderRadius: BorderRadius.circular(28),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 70,
-            height: 70,
-            decoration: const BoxDecoration(
-              color: Color(0xFFE3D5F6),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                initialsFor(managerName),
-                style: const TextStyle(
-                  color: Color(0xFF2E8933),
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stackActions = constraints.maxWidth < 360;
+          final identity = Row(
+            children: [
+              Container(
+                width: avatarSize,
+                height: avatarSize,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE3D5F6),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    initialsFor(managerName),
+                    style: TextStyle(
+                      color: const Color(0xFF2E8933),
+                      fontSize: isCompact ? 20 : 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              'Namaste,\nManager $managerName!',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                height: 1.2,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  'Namaste,\nManager $managerName!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isCompact ? 18 : 20,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                  ),
+                ),
               ),
-            ),
-          ),
-          IconButton(
+            ],
+          );
+
+          final bellButton = IconButton(
             onPressed: onBellTap,
-            icon: const Icon(
+            icon: Icon(
               Icons.notifications,
               color: Colors.white,
-              size: 32,
+              size: isCompact ? 28 : 32,
             ),
-          ),
-        ],
+          );
+
+          if (stackActions) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                identity,
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: bellButton,
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: identity),
+              bellButton,
+            ],
+          );
+        },
       ),
     );
   }
@@ -454,99 +488,127 @@ class _HealthSummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: _LegendText(
-                  color: const Color(0xFFFF4B3E),
-                  text: 'Critical Health:$criticalTrees',
-                ),
-              ),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: _LegendText(
-                    color: const Color(0xFF59C154),
-                    text: 'Good Health:$healthyTrees',
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stackContent = constraints.maxWidth < 420;
+              final healthSummary = Column(
+                children: [
+                  SizedBox(
+                    width: 92,
+                    height: 92,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          value: 1,
+                          strokeWidth: 11,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.grey.shade300,
+                          ),
+                        ),
+                        CircularProgressIndicator(
+                          value: goodRatio.clamp(0.0, 1.0),
+                          strokeWidth: 11,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF82D28A),
+                          ),
+                          backgroundColor: Colors.transparent,
+                        ),
+                        Text(
+                          '$healthyTrees',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              SizedBox(
-                width: 112,
-                child: Column(
-                  children: [
-                    SizedBox(
-                      width: 92,
-                      height: 92,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            value: 1,
-                            strokeWidth: 11,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.grey.shade300,
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Good Health',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF2D2D2D),
+                    ),
+                  ),
+                ],
+              );
+
+              final bars = Column(
+                children: [
+                  _HealthBarRow(
+                    label: 'Low',
+                    value: lowRatio,
+                    color: const Color(0xFFB99E95),
+                  ),
+                  const SizedBox(height: 16),
+                  _HealthBarRow(
+                    label: 'Good',
+                    value: goodRatio,
+                    color: const Color(0xFF84D38A),
+                  ),
+                  const SizedBox(height: 16),
+                  _HealthBarRow(
+                    label: 'High',
+                    value: highRatio,
+                    color: const Color(0xFFFF8A84),
+                  ),
+                ],
+              );
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (stackContent) ...[
+                    _LegendText(
+                      color: const Color(0xFFFF4B3E),
+                      text: 'Critical Health:$criticalTrees',
+                    ),
+                    const SizedBox(height: 12),
+                    _LegendText(
+                      color: const Color(0xFF59C154),
+                      text: 'Good Health:$healthyTrees',
+                    ),
+                  ] else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _LegendText(
+                            color: const Color(0xFFFF4B3E),
+                            text: 'Critical Health:$criticalTrees',
+                          ),
+                        ),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: _LegendText(
+                              color: const Color(0xFF59C154),
+                              text: 'Good Health:$healthyTrees',
                             ),
                           ),
-                          CircularProgressIndicator(
-                            value: goodRatio.clamp(0.0, 1.0),
-                            strokeWidth: 11,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFF82D28A),
-                            ),
-                            backgroundColor: Colors.transparent,
-                          ),
-                          Text(
-                            '$healthyTrees',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'Good Health',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF2D2D2D),
-                      ),
+                  const SizedBox(height: 24),
+                  if (stackContent) ...[
+                    Center(child: healthSummary),
+                    const SizedBox(height: 24),
+                    bars,
+                  ] else
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 112,
+                          child: healthSummary,
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(child: bars),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  children: [
-                    _HealthBarRow(
-                      label: 'Low',
-                      value: lowRatio,
-                      color: const Color(0xFFB99E95),
-                    ),
-                    const SizedBox(height: 16),
-                    _HealthBarRow(
-                      label: 'Good',
-                      value: goodRatio,
-                      color: const Color(0xFF84D38A),
-                    ),
-                    const SizedBox(height: 16),
-                    _HealthBarRow(
-                      label: 'High',
-                      value: highRatio,
-                      color: const Color(0xFFFF8A84),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -798,7 +860,7 @@ class _DashboardBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -811,48 +873,69 @@ class _DashboardBottomNav extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            _BottomNavItem(
-              icon: Icons.home,
-              label: 'Home',
-              active: true,
-              onTap: onHomeTap,
-            ),
-            _BottomNavItem(
-              icon: Icons.agriculture_outlined,
-              label: 'My Farms',
-              onTap: onFarmsTap,
-            ),
-            GestureDetector(
-              onTap: onScanTap,
-              child: Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF59C154),
-                  shape: BoxShape.circle,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 390;
+            final scanSize = isCompact ? 60.0 : 72.0;
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: _BottomNavItem(
+                    icon: Icons.home,
+                    label: 'Home',
+                    active: true,
+                    onTap: onHomeTap,
+                    compact: isCompact,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.qr_code_2_rounded,
-                  color: Colors.white,
-                  size: 34,
+                Expanded(
+                  child: _BottomNavItem(
+                    icon: Icons.agriculture_outlined,
+                    label: 'My Farms',
+                    onTap: onFarmsTap,
+                    compact: isCompact,
+                  ),
                 ),
-              ),
-            ),
-            _BottomNavItem(
-              icon: Icons.bar_chart_rounded,
-              label: 'Analytics',
-              onTap: onAnalyticsTap,
-            ),
-            _BottomNavItem(
-              icon: Icons.person,
-              label: 'Profile',
-              onTap: onProfileTap,
-            ),
-          ],
+                SizedBox(
+                  width: scanSize,
+                  child: GestureDetector(
+                    onTap: onScanTap,
+                    child: Container(
+                      width: scanSize,
+                      height: scanSize,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF59C154),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.qr_code_2_rounded,
+                        color: Colors.white,
+                        size: isCompact ? 28 : 34,
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _BottomNavItem(
+                    icon: Icons.bar_chart_rounded,
+                    label: 'Analytics',
+                    onTap: onAnalyticsTap,
+                    compact: isCompact,
+                  ),
+                ),
+                Expanded(
+                  child: _BottomNavItem(
+                    icon: Icons.person,
+                    label: 'Profile',
+                    onTap: onProfileTap,
+                    compact: isCompact,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -865,32 +948,36 @@ class _BottomNavItem extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.active = false,
+    this.compact = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool active;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final color = active ? const Color(0xFF59C154) : Colors.grey.shade500;
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: SizedBox(
-        width: 58,
+      child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 30),
+            Icon(icon, color: color, size: compact ? 26 : 30),
             const SizedBox(height: 4),
             Text(
               label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: color,
-                fontSize: 11,
+                fontSize: compact ? 10 : 11,
                 fontWeight: active ? FontWeight.w600 : FontWeight.w500,
               ),
             ),

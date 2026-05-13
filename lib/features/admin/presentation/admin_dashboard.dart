@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router/route_paths.dart';
+import '../../../core/localization/app_language.dart';
 import '../../../core/providers/firebase_providers.dart';
 import '../../../data/models/user_model.dart';
+import '../../../shared/widgets/responsive_layout.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
 import '../../farm_manager/presentation/farm_manager_providers.dart';
@@ -66,26 +68,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _currentIndex = index;
           });
         },
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_rounded),
-            label: 'Home',
+            icon: const Icon(Icons.home_rounded),
+            label: context.tr('home'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.park_rounded),
-            label: 'My Farm',
+            icon: const Icon(Icons.park_rounded),
+            label: context.tr('My Farm'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.grid_view_rounded),
-            label: 'Issues',
+            icon: const Icon(Icons.grid_view_rounded),
+            label: context.tr('Issues'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_rounded),
-            label: 'Analytics',
+            icon: const Icon(Icons.bar_chart_rounded),
+            label: context.tr('Analytics'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_rounded),
-            label: 'Profile',
+            icon: const Icon(Icons.person_rounded),
+            label: context.tr('profile'),
           ),
         ],
       ),
@@ -144,6 +146,7 @@ class _AdminDashboardHome extends ConsumerWidget {
       overview: overviewAsync.value!,
       activityOverview: activityAsync.value!,
     );
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -151,14 +154,19 @@ class _AdminDashboardHome extends ConsumerWidget {
         child: Column(
           children: [
             _HeaderBar(
-              title: 'Namaste, ${dashboardData.greetingName}',
+              title: '${context.tr('namaste')}, ${dashboardData.greetingName}',
               onMenuTap: () => _showMenuSheet(context, ref),
               onNotificationsTap: () =>
                   _showAlertsSheet(context, dashboardData),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  16,
+                  horizontalPadding,
+                  20,
+                ),
                 child: Column(
                   children: [
                     _Panel(
@@ -211,8 +219,8 @@ class _AdminDashboardHome extends ConsumerWidget {
             children: [
               ListTile(
                 leading: const Icon(Icons.people_alt_outlined),
-                title: const Text('User Management'),
-                subtitle: const Text('Add, edit, and remove users'),
+                title: Text(context.tr('User Management')),
+                subtitle: Text(context.tr('Add, edit, and remove users')),
                 onTap: () {
                   Navigator.pop(context);
                   _openUserManagement(context);
@@ -220,8 +228,8 @@ class _AdminDashboardHome extends ConsumerWidget {
               ),
               ListTile(
                 leading: const Icon(Icons.history_rounded),
-                title: const Text('Activity Overview'),
-                subtitle: const Text('Open the admin activity overview'),
+                title: Text(context.tr('Activity Overview')),
+                subtitle: Text(context.tr('Open the admin activity overview')),
                 onTap: () {
                   Navigator.pop(context);
                   _openActivityOverview(context);
@@ -229,8 +237,8 @@ class _AdminDashboardHome extends ConsumerWidget {
               ),
               ListTile(
                 leading: const Icon(Icons.person_outline_rounded),
-                title: const Text('Profile'),
-                subtitle: const Text('Open your profile settings'),
+                title: Text(context.tr('profile')),
+                subtitle: Text(context.tr('Open your profile settings')),
                 onTap: () {
                   Navigator.pop(context);
                   context.push('/profile');
@@ -238,8 +246,8 @@ class _AdminDashboardHome extends ConsumerWidget {
               ),
               ListTile(
                 leading: const Icon(Icons.logout_rounded),
-                title: const Text('Logout'),
-                subtitle: const Text('Sign out from admin dashboard'),
+                title: Text(context.tr('logout')),
+                subtitle: Text(context.tr('Sign out from admin dashboard')),
                 onTap: () async {
                   Navigator.pop(context);
                   await _logout(context, ref);
@@ -284,18 +292,18 @@ class _AdminDashboardHome extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Admin Alerts',
-                  style: TextStyle(
+                Text(
+                  context.tr('Admin Alerts'),
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 12),
                 if (alerts.isEmpty)
-                  const Text(
-                    'No active alerts right now.',
-                    style: TextStyle(color: _adminTextMuted),
+                  Text(
+                    context.tr('No active alerts right now.'),
+                    style: const TextStyle(color: _adminTextMuted),
                   )
                 else
                   ...alerts.map(
@@ -348,7 +356,7 @@ class _AdminDashboardHome extends ConsumerWidget {
                       _openIssuesScreen(context);
                     },
                     icon: const Icon(Icons.grid_view_rounded),
-                    label: const Text('Open Issues'),
+                    label: Text(context.tr('Open Issues')),
                   ),
                 ),
               ],
@@ -363,18 +371,18 @@ class _AdminDashboardHome extends ConsumerWidget {
     final shouldLogout = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Logout'),
-            content: const Text(
-              'Do you want to sign out from the admin dashboard?',
+            title: Text(context.tr('logout')),
+            content: Text(
+              context.tr('Do you want to sign out from the admin dashboard?'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+                child: Text(context.tr('cancel')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Logout'),
+                child: Text(context.tr('logout')),
               ),
             ],
           ),
@@ -437,6 +445,8 @@ class _HeaderBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context);
+
     return Container(
       width: double.infinity,
       color: _adminGreenDark,
@@ -447,35 +457,38 @@ class _HeaderBar extends StatelessWidget {
             onPressed: onMenuTap,
             icon: const Icon(Icons.menu_rounded),
             color: Colors.white,
-            iconSize: 36,
+            iconSize: isCompact ? 32 : 36,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: isCompact ? 12 : 16),
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: isCompact ? 16 : 18,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
+          SizedBox(width: isCompact ? 10 : 12),
           InkWell(
             onTap: onNotificationsTap,
             borderRadius: BorderRadius.circular(999),
             child: Container(
-              width: 58,
-              height: 58,
+              width: isCompact ? 48 : 58,
+              height: isCompact ? 48 : 58,
               decoration: const BoxDecoration(
                 color: _adminGreenBright,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.notifications_active_outlined,
                 color: Colors.white,
-                size: 30,
+                size: isCompact ? 26 : 30,
               ),
             ),
           ),
@@ -511,6 +524,8 @@ class _HealthScoreCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -526,8 +541,8 @@ class _HealthScoreCard extends StatelessWidget {
         Row(
           children: [
             Container(
-              width: 76,
-              height: 76,
+              width: isCompact ? 64 : 76,
+              height: isCompact ? 64 : 76,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(22),
@@ -537,18 +552,18 @@ class _HealthScoreCard extends StatelessWidget {
                     ? Icons.warning_amber_rounded
                     : Icons.speed_rounded,
                 color: data.healthColor,
-                size: 42,
+                size: isCompact ? 36 : 42,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: isCompact ? 12 : 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     data.healthLabel,
-                    style: const TextStyle(
-                      fontSize: 18,
+                    style: TextStyle(
+                      fontSize: isCompact ? 16 : 18,
                       fontWeight: FontWeight.w500,
                       color: _adminTextDark,
                     ),
@@ -655,43 +670,41 @@ class _UserStatsCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        Row(
+        ResponsiveWrapGrid(
+          minChildWidth: 88,
+          maxColumns: 4,
+          spacing: 10,
           children: [
-            for (var index = 0; index < stats.length; index++)
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.only(
-                    right: index == stats.length - 1 ? 0 : 10,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEAF5E8),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        stats[index].key,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: _adminTextDark,
-                        ),
-                        textAlign: TextAlign.center,
+            for (final stat in stats)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF5E8),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      stat.key,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: _adminTextDark,
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        stats[index].value,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: _adminTextDark,
-                        ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      stat.value,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _adminTextDark,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
           ],
@@ -706,37 +719,35 @@ class _UserStatsCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        Row(
+        ResponsiveWrapGrid(
+          minChildWidth: 170,
+          maxColumns: 2,
+          spacing: 10,
           children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onManageUsers,
-                icon: const Icon(Icons.people_outline_rounded),
-                label: const Text('Manage Users'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _adminGreenDark,
-                  side: const BorderSide(color: Color(0xFFB7D4BC)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+            OutlinedButton.icon(
+              onPressed: onManageUsers,
+              icon: const Icon(Icons.people_outline_rounded),
+              label: const Text('Manage Users'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _adminGreenDark,
+                side: const BorderSide(color: Color(0xFFB7D4BC)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: onOpenActivity,
-                icon: const Icon(Icons.history_rounded),
-                label: const Text('Audit Log'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: _adminGreenDark,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+            FilledButton.icon(
+              onPressed: onOpenActivity,
+              icon: const Icon(Icons.history_rounded),
+              label: const Text('Audit Log'),
+              style: FilledButton.styleFrom(
+                backgroundColor: _adminGreenDark,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ],

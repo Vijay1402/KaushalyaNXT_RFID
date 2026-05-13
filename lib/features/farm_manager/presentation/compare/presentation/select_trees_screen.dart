@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../shared/widgets/responsive_layout.dart';
 import '../models/compare_model.dart';
 import 'compare_screen.dart';
 import 'widgets/filter_chip.dart';
@@ -62,22 +63,27 @@ class _SelectTreesScreenState extends State<SelectTreesScreen> {
         foregroundColor: Colors.white,
         title: const Text('Select Trees'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Filters',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+      body: SafeArea(
+        child: Padding(
+          padding: ResponsiveLayout.pageInsets(
+            context,
+            top: 16,
+            bottom: 16,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Filters',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: ['Yield', 'Health', 'Sync']
                     .map(
                       (filter) => CustomFilterChip(
@@ -88,59 +94,59 @@ class _SelectTreesScreenState extends State<SelectTreesScreen> {
                     )
                     .toList(growable: false),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '${selectedTrees.length} selected tree(s)',
-              style: TextStyle(color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: widget.trees.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No trees are available for comparison.',
-                        style: TextStyle(color: Colors.grey.shade700),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: widget.trees.length,
-                      itemBuilder: (context, index) {
-                        final tree = widget.trees[index];
-                        final isSelected = selectedTreeIds.contains(tree.id);
-
-                        return TreeCard(
-                          tree: tree,
-                          isSelected: isSelected,
-                          onTap: () => _toggleTree(tree.id),
-                        );
-                      },
-                    ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: selectedTrees.length < 2
-                    ? null
-                    : () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => CompareResultScreen(
-                              trees: selectedTrees,
-                              initialFilters: filters,
-                            ),
-                          ),
-                        );
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Compare'),
+              const SizedBox(height: 16),
+              Text(
+                '${selectedTrees.length} selected tree(s)',
+                style: TextStyle(color: Colors.grey.shade700),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Expanded(
+                child: widget.trees.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No trees are available for comparison.',
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: widget.trees.length,
+                        itemBuilder: (context, index) {
+                          final tree = widget.trees[index];
+                          final isSelected = selectedTreeIds.contains(tree.id);
+
+                          return TreeCard(
+                            tree: tree,
+                            isSelected: isSelected,
+                            onTap: () => _toggleTree(tree.id),
+                          );
+                        },
+                      ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: selectedTrees.length < 2
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => CompareResultScreen(
+                                trees: selectedTrees,
+                                initialFilters: filters,
+                              ),
+                            ),
+                          );
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('Compare'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

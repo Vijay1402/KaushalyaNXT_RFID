@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/widgets/responsive_layout.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
 import '../../farm_manager/presentation/farm_manager_providers.dart';
 import 'admin_farm_detail_screen.dart';
@@ -83,6 +84,7 @@ class _AdminFarmManagementScreenState
   @override
   Widget build(BuildContext context) {
     final overviewAsync = ref.watch(globalFarmOverviewProvider);
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F2),
@@ -135,7 +137,12 @@ class _AdminFarmManagementScreenState
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    14,
+                    horizontalPadding,
+                    0,
+                  ),
                   child: TextField(
                     controller: _searchController,
                     onChanged: (value) {
@@ -156,58 +163,71 @@ class _AdminFarmManagementScreenState
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Row(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    12,
+                    horizontalPadding,
+                    0,
+                  ),
+                  child: ResponsiveWrapGrid(
+                    minChildWidth: 140,
+                    maxColumns: 2,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      Expanded(
-                        child: _SummaryCard(
-                          title: 'All Farms',
-                          value: '${farms.length}',
-                          subtitle: 'Managed farms',
-                          color: const Color(0xFF1E5631),
-                        ),
+                      _SummaryCard(
+                        title: 'All Farms',
+                        value: '${farms.length}',
+                        subtitle: 'Managed farms',
+                        color: const Color(0xFF1E5631),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _SummaryCard(
-                          title: 'Trees',
-                          value: '${treeDocs.length}',
-                          subtitle: 'Across every farm',
-                          color: Colors.green.shade700,
-                          onTap: _openTrees,
-                        ),
+                      _SummaryCard(
+                        title: 'Trees',
+                        value: '${treeDocs.length}',
+                        subtitle: 'Across every farm',
+                        color: Colors.green.shade700,
+                        onTap: _openTrees,
                       ),
                     ],
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                  child: Row(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    10,
+                    horizontalPadding,
+                    0,
+                  ),
+                  child: ResponsiveWrapGrid(
+                    minChildWidth: 140,
+                    maxColumns: 2,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      Expanded(
-                        child: _SummaryCard(
-                          title: 'Health',
-                          value: '$averageHealth%',
-                          subtitle: 'Average farm health',
-                          color: Colors.teal.shade700,
-                        ),
+                      _SummaryCard(
+                        title: 'Health',
+                        value: '$averageHealth%',
+                        subtitle: 'Average farm health',
+                        color: Colors.teal.shade700,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _SummaryCard(
-                          title: 'Issues',
-                          value: '${issues.length}',
-                          subtitle: 'Visible to admin',
-                          color: issues.isEmpty
-                              ? Colors.orange.shade700
-                              : Colors.red.shade700,
-                        ),
+                      _SummaryCard(
+                        title: 'Issues',
+                        value: '${issues.length}',
+                        subtitle: 'Visible to admin',
+                        color: issues.isEmpty
+                            ? Colors.orange.shade700
+                            : Colors.red.shade700,
                       ),
                     ],
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    12,
+                    horizontalPadding,
+                    0,
+                  ),
                   child: SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -250,7 +270,12 @@ class _AdminFarmManagementScreenState
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          padding: EdgeInsets.fromLTRB(
+                            horizontalPadding,
+                            0,
+                            horizontalPadding,
+                            24,
+                          ),
                           itemCount: filteredFarms.length,
                           itemBuilder: (context, index) {
                             final farm = filteredFarms[index];

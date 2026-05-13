@@ -209,8 +209,11 @@ Future<FarmManagerScope> loadFarmManagerScope({
   String currentRole = '';
 
   try {
-    final managerDoc =
-        await firestoreInstance.collection('users').doc(currentUser.uid).get();
+    final managerDoc = await firestoreInstance
+        .collection('users')
+        .doc(currentUser.uid)
+        .get()
+        .timeout(const Duration(seconds: 4));
     managerCode = (managerDoc.data()?['managerCode'] ?? '').toString().trim();
     currentRole = (managerDoc.data()?['role'] ?? '').toString().trim();
   } catch (_) {
@@ -239,7 +242,8 @@ Future<FarmManagerScope> loadFarmManagerScope({
     final linkedFarmers = await firestoreInstance
         .collection('users')
         .where('farmManagerId', isEqualTo: currentUser.uid)
-        .get();
+        .get()
+        .timeout(const Duration(seconds: 4));
 
     for (final farmer in linkedFarmers.docs) {
       linkedFarmerIds.add(farmer.id);

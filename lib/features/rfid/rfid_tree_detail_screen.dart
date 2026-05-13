@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/models/tree_model.dart';
+import '../../shared/widgets/responsive_layout.dart';
 import 'rfid_scan_screen.dart';
 
 class TreeDetailScreen extends StatefulWidget {
@@ -189,25 +190,26 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                       ),
                     ] else ...[
                       // Two big buttons — Camera & Gallery
-                      Row(children: [
-                        Expanded(
-                          child: _imagePickButton(
+                      ResponsiveWrapGrid(
+                        minChildWidth: 150,
+                        maxColumns: 2,
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _imagePickButton(
                             icon: Icons.camera_alt,
                             label: 'Camera',
                             color: _green1,
                             onTap: () => pickImage(ImageSource.camera),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _imagePickButton(
+                          _imagePickButton(
                             icon: Icons.photo_library_outlined,
                             label: 'Gallery',
                             color: Colors.blue.shade700,
                             onTap: () => pickImage(ImageSource.gallery),
                           ),
-                        ),
-                      ]),
+                        ],
+                      ),
                     ],
 
                     const SizedBox(height: 20),
@@ -341,7 +343,7 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                   const SizedBox(height: 12),
                   _buildTagCloudPanel(context),
                   const SizedBox(height: 12),
-                  _buildRFIDStatusPanel(),
+                  _buildRFIDStatusPanel(context),
                   const SizedBox(height: 12),
                   _buildTreeProfileCard(),
                   const SizedBox(height: 12),
@@ -371,57 +373,61 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
       foregroundColor: Colors.white,
 
       // ── Online/offline dot next to title ──────────────────────
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('Tree Details',
-              style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color: _isOnline
-                  ? Colors.green.shade400.withValues(alpha: 0.25)
-                  : Colors.red.shade400.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: _isOnline ? Colors.greenAccent : Colors.redAccent,
-                width: 1,
+      title: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Tree Details',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: _isOnline
+                    ? Colors.green.shade400.withValues(alpha: 0.25)
+                    : Colors.red.shade400.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _isOnline ? Colors.greenAccent : Colors.redAccent,
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _isOnline
+                        ? Colors.greenAccent.withValues(alpha: 0.5)
+                        : Colors.redAccent.withValues(alpha: 0.5),
+                    blurRadius: 6,
+                  ),
+                ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: _isOnline
-                      ? Colors.greenAccent.withValues(alpha: 0.5)
-                      : Colors.redAccent.withValues(alpha: 0.5),
-                  blurRadius: 6,
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _isOnline ? Colors.greenAccent : Colors.redAccent,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _isOnline ? Colors.greenAccent : Colors.redAccent,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _isOnline ? 'online' : 'offline',
-                  style: TextStyle(
-                    color: _isOnline ? Colors.greenAccent : Colors.redAccent,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
+                  const SizedBox(width: 4),
+                  Text(
+                    _isOnline ? 'online' : 'offline',
+                    style: TextStyle(
+                      color: _isOnline ? Colors.greenAccent : Colors.redAccent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
 
       actions: [
@@ -561,9 +567,9 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                         ),
                       ],
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
+                      children: [
                         Icon(Icons.report_problem_outlined,
                             color: Colors.white, size: 13),
                         SizedBox(width: 4),
@@ -740,7 +746,7 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
   }
 
   // ── RFID Status Panel ─────────────────────────────────────────────────────
-  Widget _buildRFIDStatusPanel() {
+  Widget _buildRFIDStatusPanel(BuildContext context) {
     final now = DateTime.now();
     final h = now.hour % 12 == 0 ? 12 : now.hour % 12;
     final m = now.minute.toString().padLeft(2, '0');
@@ -772,12 +778,15 @@ class _TreeDetailScreenState extends State<TreeDetailScreen> {
                     fontSize: 13)),
           ]),
           const SizedBox(height: 10),
-          Text('Tag EPC: ${widget.tree.rfidTag}',
-              style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: _dark,
-                  letterSpacing: 0.5)),
+          SelectableText(
+            'Tag EPC: ${widget.tree.rfidTag}',
+            style: TextStyle(
+              fontSize: ResponsiveLayout.fontSize(context, 20),
+              fontWeight: FontWeight.w900,
+              color: _dark,
+              letterSpacing: 0.5,
+            ),
+          ),
           const SizedBox(height: 8),
           Text('Tag TID: ${widget.tree.rfidTid}',
               style: const TextStyle(

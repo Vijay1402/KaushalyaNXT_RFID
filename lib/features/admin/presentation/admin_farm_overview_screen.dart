@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/providers/firebase_providers.dart';
 import '../../../data/models/user_model.dart';
+import '../../../shared/widgets/responsive_layout.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
 import '../../farm_manager/presentation/farm_manager_providers.dart';
@@ -152,22 +153,19 @@ class _OverviewBody extends StatelessWidget {
               children: [
                 const _SectionLabel(label: 'SUMMARY'),
                 const SizedBox(height: 10),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: stats.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1.02,
-                  ),
-                  itemBuilder: (context, index) {
-                    return _SummaryCard(
-                      stat: stats[index],
-                      onTap: () => _openRecords(context, stats[index].filter),
-                    );
-                  },
+                ResponsiveWrapGrid(
+                  minChildWidth: 150,
+                  maxColumns: 2,
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: stats
+                      .map(
+                        (stat) => _SummaryCard(
+                          stat: stat,
+                          onTap: () => _openRecords(context, stat.filter),
+                        ),
+                      )
+                      .toList(growable: false),
                 ),
                 const SizedBox(height: 16),
                 const _SectionLabel(label: 'RECENT ACTIVITIES'),
@@ -423,20 +421,45 @@ class AdminFarmRecordDetailScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    activity.recordTitle,
-                                    style: const TextStyle(
-                                      color: AdminFarmOverviewScreen.greenDark,
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w800,
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final isCompact = constraints.maxWidth < 280;
+                                if (!isCompact) {
+                                  return Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          activity.recordTitle,
+                                          style: const TextStyle(
+                                            color: AdminFarmOverviewScreen
+                                                .greenDark,
+                                            fontSize: 28,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                      _TypeBadge(type: activity.type),
+                                    ],
+                                  );
+                                }
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      activity.recordTitle,
+                                      style: const TextStyle(
+                                        color:
+                                            AdminFarmOverviewScreen.greenDark,
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                _TypeBadge(type: activity.type),
-                              ],
+                                    const SizedBox(height: 12),
+                                    _TypeBadge(type: activity.type),
+                                  ],
+                                );
+                              },
                             ),
                             const SizedBox(height: 18),
                             _DetailRow(
@@ -806,6 +829,7 @@ class _SummaryCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
         child: Container(
+          constraints: const BoxConstraints(minHeight: 136),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
@@ -830,7 +854,7 @@ class _SummaryCard extends StatelessWidget {
                 ),
                 child: Icon(stat.icon, color: stat.iconColor, size: 20),
               ),
-              const Spacer(),
+              const SizedBox(height: 26),
               Text(
                 stat.value,
                 style: const TextStyle(
@@ -879,49 +903,84 @@ class _ActivityCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AdminFarmOverviewScreen.border),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  color: activity.dotColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 260;
+              final details = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    activity.title,
+                    style: const TextStyle(
+                      color: AdminFarmOverviewScreen.textDark,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    activity.subtitle,
+                    style: const TextStyle(
+                      color: AdminFarmOverviewScreen.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              );
+
+              if (!isCompact) {
+                return Row(
                   children: [
-                    Text(
-                      activity.title,
-                      style: const TextStyle(
-                        color: AdminFarmOverviewScreen.textDark,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                    Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: activity.dotColor,
+                        shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(width: 12),
+                    Expanded(child: details),
+                    const SizedBox(width: 10),
                     Text(
-                      activity.subtitle,
+                      _timeAgo(activity.eventDate),
                       style: const TextStyle(
                         color: AdminFarmOverviewScreen.textMuted,
                         fontSize: 12,
                       ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                _timeAgo(activity.eventDate),
-                style: const TextStyle(
-                  color: AdminFarmOverviewScreen.textMuted,
-                  fontSize: 12,
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: activity.dotColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: details),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _timeAgo(activity.eventDate),
+                    style: const TextStyle(
+                      color: AdminFarmOverviewScreen.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -997,58 +1056,74 @@ class _RecordCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: AdminFarmOverviewScreen.border),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      activity.recordTitle,
-                      style: const TextStyle(
-                        color: AdminFarmOverviewScreen.greenDark,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 280;
+              final details = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    activity.recordTitle,
+                    style: const TextStyle(
+                      color: AdminFarmOverviewScreen.greenDark,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      activity.farmerName.isEmpty
-                          ? 'Unknown Farmer'
-                          : activity.farmerName,
-                      style: const TextStyle(
-                        color: AdminFarmOverviewScreen.textDark,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    activity.farmerName.isEmpty
+                        ? 'Unknown Farmer'
+                        : activity.farmerName,
+                    style: const TextStyle(
+                      color: AdminFarmOverviewScreen.textDark,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on_rounded,
-                          size: 15,
-                          color: Color(0xFFE6768E),
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            activity.locationLabel,
-                            style: const TextStyle(
-                              color: AdminFarmOverviewScreen.textMuted,
-                              fontSize: 12,
-                            ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_rounded,
+                        size: 15,
+                        color: Color(0xFFE6768E),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          activity.locationLabel,
+                          style: const TextStyle(
+                            color: AdminFarmOverviewScreen.textMuted,
+                            fontSize: 12,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+
+              if (!isCompact) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: details),
+                    const SizedBox(width: 10),
+                    _TypeBadge(type: activity.type),
                   ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              _TypeBadge(type: activity.type),
-            ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  details,
+                  const SizedBox(height: 10),
+                  _TypeBadge(type: activity.type),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -1142,6 +1217,51 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context, breakpoint: 340);
+
+    if (isCompact) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          border: isLast
+              ? null
+              : const Border(
+                  bottom: BorderSide(color: Color(0xFFE7ECE1)),
+                ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF97A392),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: onTap,
+              child: Text(
+                value.isEmpty ? '-' : value,
+                style: TextStyle(
+                  color: highlight
+                      ? AdminFarmOverviewScreen.greenDark
+                      : AdminFarmOverviewScreen.textDark,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  decoration: onTap != null
+                      ? TextDecoration.underline
+                      : TextDecoration.none,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 13),
       decoration: BoxDecoration(
@@ -1336,6 +1456,8 @@ class _ProfileField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context, breakpoint: 340);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1355,20 +1477,35 @@ class _ProfileField extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AdminFarmOverviewScreen.border),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  value,
-                  style: const TextStyle(
-                    color: AdminFarmOverviewScreen.greenDark,
-                    fontWeight: FontWeight.w700,
-                  ),
+          child: isCompact && trailing != null
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        color: AdminFarmOverviewScreen.greenDark,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    trailing!,
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        value,
+                        style: const TextStyle(
+                          color: AdminFarmOverviewScreen.greenDark,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (trailing != null) trailing!,
+                  ],
                 ),
-              ),
-              if (trailing != null) trailing!,
-            ],
-          ),
         ),
       ],
     );

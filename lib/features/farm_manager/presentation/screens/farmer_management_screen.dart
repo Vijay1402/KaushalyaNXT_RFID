@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../shared/widgets/responsive_layout.dart';
 import '../farm_manager_data.dart';
 import '../farm_manager_providers.dart';
 
@@ -94,12 +95,18 @@ class _FarmerManagementScreenState
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (sheetContext) {
+        final horizontalPadding = ResponsiveLayout.pagePadding(sheetContext);
         return SafeArea(
           top: false,
           child: SizedBox(
             height: MediaQuery.of(sheetContext).size.height * 0.72,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                18,
+                horizontalPadding,
+                24,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -245,41 +252,37 @@ class _FarmerManagementScreenState
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Row(
+                  ResponsiveWrapGrid(
+                    minChildWidth: 120,
+                    maxColumns: 3,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: farmer.phone.isEmpty
-                              ? null
-                              : () => _callFarmer(farmer.phone),
-                          icon: const Icon(Icons.call_outlined),
-                          label: const Text('Call'),
-                        ),
+                      OutlinedButton.icon(
+                        onPressed: farmer.phone.isEmpty
+                            ? null
+                            : () => _callFarmer(farmer.phone),
+                        icon: const Icon(Icons.call_outlined),
+                        label: const Text('Call'),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: farmer.email.isEmpty
-                              ? null
-                              : () => _emailFarmer(farmer.email),
-                          icon: const Icon(Icons.mail_outline),
-                          label: const Text('Email'),
-                        ),
+                      OutlinedButton.icon(
+                        onPressed: farmer.email.isEmpty
+                            ? null
+                            : () => _emailFarmer(farmer.email),
+                        icon: const Icon(Icons.mail_outline),
+                        label: const Text('Email'),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: farmer.hasContact
-                              ? () => _copyValue(
-                                    'Farmer contact',
-                                    farmer.phone.isNotEmpty
-                                        ? farmer.phone
-                                        : farmer.email,
-                                  )
-                              : null,
-                          icon: const Icon(Icons.copy_outlined),
-                          label: const Text('Copy'),
-                        ),
+                      OutlinedButton.icon(
+                        onPressed: farmer.hasContact
+                            ? () => _copyValue(
+                                  'Farmer contact',
+                                  farmer.phone.isNotEmpty
+                                      ? farmer.phone
+                                      : farmer.email,
+                                )
+                            : null,
+                        icon: const Icon(Icons.copy_outlined),
+                        label: const Text('Copy'),
                       ),
                     ],
                   ),
@@ -295,6 +298,7 @@ class _FarmerManagementScreenState
   @override
   Widget build(BuildContext context) {
     final managedFarmersAsync = ref.watch(managedFarmersProvider);
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F5F1),
@@ -329,7 +333,12 @@ class _FarmerManagementScreenState
             children: [
               Container(
                 width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                margin: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  16,
+                  horizontalPadding,
+                  12,
+                ),
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -364,30 +373,26 @@ class _FarmerManagementScreenState
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Row(
+                    ResponsiveWrapGrid(
+                      minChildWidth: 110,
+                      maxColumns: 3,
+                      spacing: 10,
+                      runSpacing: 10,
                       children: [
-                        Expanded(
-                          child: _TopStatCard(
-                            title: 'Farmers',
-                            value: '${allFarmers.length}',
-                            icon: Icons.people_alt_outlined,
-                          ),
+                        _TopStatCard(
+                          title: 'Farmers',
+                          value: '${allFarmers.length}',
+                          icon: Icons.people_alt_outlined,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _TopStatCard(
-                            title: 'Assigned Farms',
-                            value: '$totalAssignedFarms',
-                            icon: Icons.agriculture_outlined,
-                          ),
+                        _TopStatCard(
+                          title: 'Assigned Farms',
+                          value: '$totalAssignedFarms',
+                          icon: Icons.agriculture_outlined,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _TopStatCard(
-                            title: 'Trees',
-                            value: '$totalTrees',
-                            icon: Icons.park_outlined,
-                          ),
+                        _TopStatCard(
+                          title: 'Trees',
+                          value: '$totalTrees',
+                          icon: Icons.park_outlined,
                         ),
                       ],
                     ),
@@ -395,7 +400,7 @@ class _FarmerManagementScreenState
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                 child: TextField(
                   onChanged: (value) {
                     setState(() {
@@ -428,9 +433,14 @@ class _FarmerManagementScreenState
                             style: TextStyle(color: Colors.grey.shade700),
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        )
+                      : ListView.builder(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          0,
+                          horizontalPadding,
+                          24,
+                        ),
                         itemCount: visibleFarmers.length,
                         itemBuilder: (context, index) {
                           final farmer = visibleFarmers[index];
@@ -697,30 +707,26 @@ class _FarmerManagementCard extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 14),
-            Row(
+            ResponsiveWrapGrid(
+              minChildWidth: 120,
+              maxColumns: 3,
+              spacing: 10,
+              runSpacing: 10,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onCallTap,
-                    icon: const Icon(Icons.call_outlined),
-                    label: const Text('Call'),
-                  ),
+                OutlinedButton.icon(
+                  onPressed: onCallTap,
+                  icon: const Icon(Icons.call_outlined),
+                  label: const Text('Call'),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onEmailTap,
-                    icon: const Icon(Icons.mail_outline),
-                    label: const Text('Email'),
-                  ),
+                OutlinedButton.icon(
+                  onPressed: onEmailTap,
+                  icon: const Icon(Icons.mail_outline),
+                  label: const Text('Email'),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: onDetailsTap,
-                    icon: const Icon(Icons.visibility_outlined),
-                    label: const Text('Details'),
-                  ),
+                ElevatedButton.icon(
+                  onPressed: onDetailsTap,
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('Details'),
                 ),
               ],
             ),
@@ -825,6 +831,31 @@ class _FarmerDetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context, breakpoint: 360);
+
+    if (isCompact) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(

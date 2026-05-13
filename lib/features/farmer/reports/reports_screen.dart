@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
+import '../../../shared/widgets/responsive_layout.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../tree_details/tree_controller.dart';
 
@@ -27,6 +28,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final treesAsync = ref.watch(treesProvider);
     final previewTrees = _normalizeTrees(treesAsync.valueOrNull ?? const []);
     final speciesOptions = _speciesOptions(previewTrees);
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -47,50 +49,35 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   child: Column(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding,
+                        ),
+                        child: ResponsiveWrapGrid(
+                          minChildWidth: 150,
+                          maxColumns: 2,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _metricCard(
-                                    metrics.totalTreesLabel,
-                                    'Total Trees',
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _metricCard(
-                                    metrics.averageYieldLabel,
-                                    'Avg Yield',
-                                  ),
-                                ),
-                              ],
+                            _metricCard(
+                              metrics.totalTreesLabel,
+                              'Total Trees',
                             ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _metricCard(
-                                    metrics.healthyTreesLabel,
-                                    'Healthy',
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _metricCard(
-                                    metrics.atRiskTreesLabel,
-                                    'At risk',
-                                  ),
-                                ),
-                              ],
+                            _metricCard(
+                              metrics.averageYieldLabel,
+                              'Avg Yield',
+                            ),
+                            _metricCard(
+                              metrics.healthyTreesLabel,
+                              'Healthy',
+                            ),
+                            _metricCard(
+                              metrics.atRiskTreesLabel,
+                              'At risk',
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 16),
                       Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: EdgeInsets.all(horizontalPadding),
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
@@ -99,16 +86,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                           ),
                           child: Column(
                             children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'Health Distribution',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  Row(
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final stackHeader =
+                                      constraints.maxWidth < 380;
+                                  final modeControls = Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
                                     children: [
                                       _modeChip(
                                         'weekly',
@@ -117,7 +101,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                           setState(() => healthMode = 'weekly');
                                         },
                                       ),
-                                      const SizedBox(width: 8),
                                       _modeChip(
                                         'monthly',
                                         selected: healthMode == 'monthly',
@@ -125,13 +108,45 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                         onTap: _showHealthModeSheet,
                                       ),
                                     ],
-                                  ),
-                                ],
+                                  );
+
+                                  if (stackHeader) {
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Health Distribution',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        modeControls,
+                                      ],
+                                    );
+                                  }
+
+                                  return Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Health Distribution',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      modeControls,
+                                    ],
+                                  );
+                                },
                               ),
                               const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  SizedBox(
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final stackChart = constraints.maxWidth < 380;
+                                  final chart = SizedBox(
                                     height: 120,
                                     width: 120,
                                     child: CustomPaint(
@@ -156,42 +171,60 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                         ],
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 20),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                  );
+                                  final legend = Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _legendRow(
+                                        'Healthy',
+                                        healthMetrics.healthyPercentLabel,
+                                        Colors.green,
+                                      ),
+                                      const SizedBox(height: 10),
+                                      _legendRow(
+                                        'Needs Attention',
+                                        healthMetrics
+                                            .needsAttentionPercentLabel,
+                                        Colors.orange,
+                                      ),
+                                      const SizedBox(height: 10),
+                                      _legendRow(
+                                        'At Risk',
+                                        healthMetrics.atRiskPercentLabel,
+                                        Colors.red,
+                                      ),
+                                    ],
+                                  );
+
+                                  if (stackChart) {
+                                    return Column(
                                       children: [
-                                        _legendRow(
-                                          'Healthy',
-                                          healthMetrics.healthyPercentLabel,
-                                          Colors.green,
-                                        ),
-                                        const SizedBox(height: 10),
-                                        _legendRow(
-                                          'Needs Attention',
-                                          healthMetrics
-                                              .needsAttentionPercentLabel,
-                                          Colors.orange,
-                                        ),
-                                        const SizedBox(height: 10),
-                                        _legendRow(
-                                          'At Risk',
-                                          healthMetrics.atRiskPercentLabel,
-                                          Colors.red,
+                                        chart,
+                                        const SizedBox(height: 16),
+                                        Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: legend,
                                         ),
                                       ],
-                                    ),
-                                  ),
-                                ],
+                                    );
+                                  }
+
+                                  return Row(
+                                    children: [
+                                      chart,
+                                      const SizedBox(width: 20),
+                                      Expanded(child: legend),
+                                    ],
+                                  );
+                                },
                               ),
                             ],
                           ),
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: EdgeInsets.all(horizontalPadding),
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
@@ -201,16 +234,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'Yield Trends',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  InkWell(
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final stackHeader =
+                                      constraints.maxWidth < 360;
+                                  final rangeChip = InkWell(
                                     onTap: _showRangeSheet,
                                     borderRadius: BorderRadius.circular(8),
                                     child: Padding(
@@ -236,8 +264,39 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                         ],
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  );
+
+                                  if (stackHeader) {
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Yield Trends',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        rangeChip,
+                                      ],
+                                    );
+                                  }
+
+                                  return Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Yield Trends',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      rangeChip,
+                                    ],
+                                  );
+                                },
                               ),
                               const SizedBox(height: 16),
                               SizedBox(
@@ -255,45 +314,43 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: EdgeInsets.all(horizontalPadding),
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.orange.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final stackMetrics = constraints.maxWidth < 360;
+                              final leading = Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withValues(
+                                        alpha: 0.1,
                                       ),
-                                      child: const Icon(
-                                        Icons.qr_code,
-                                        color: Colors.orange,
-                                        size: 20,
-                                      ),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
-                                    const SizedBox(width: 10),
-                                    const Expanded(
-                                      child: Text(
-                                        'RFID Activity',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                    child: const Icon(
+                                      Icons.qr_code,
+                                      color: Colors.orange,
+                                      size: 20,
                                     ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Column(
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Flexible(
+                                    child: Text(
+                                      'RFID Activity',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              );
+                              final summary = Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
@@ -309,8 +366,32 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                     ),
                                   ),
                                 ],
-                              ),
-                            ],
+                              );
+
+                              if (stackMetrics) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    leading,
+                                    const SizedBox(height: 12),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: summary,
+                                    ),
+                                  ],
+                                );
+                              }
+
+                              return Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(child: leading),
+                                  const SizedBox(width: 10),
+                                  summary,
+                                ],
+                              );
+                            },
                           ),
                         ),
                       ),
@@ -340,46 +421,47 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   Widget _buildHeader(String userLabel) {
     return Container(
-      height: 100,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
       color: const Color(0xFF2E7D32),
       child: SafeArea(
         bottom: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                InkWell(
-                  onTap: () {
-                    if (Navigator.of(context).canPop()) {
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.menu, color: Colors.white),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Analytics Dashboard',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ],
-            ),
-            CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Text(
-                _initials(userLabel),
-                style: const TextStyle(
-                  color: Color(0xFF2E7D32),
-                  fontWeight: FontWeight.bold,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Row(
+            children: [
+              InkWell(
+                onTap: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  }
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.menu, color: Colors.white),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Analytics Dashboard',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(width: 12),
+              CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Text(
+                  _initials(userLabel),
+                  style: const TextStyle(
+                    color: Color(0xFF2E7D32),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -388,49 +470,46 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Widget _buildFilterRow(List<String> speciesOptions) {
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _filterButton(Icons.filter_list, 'Filters'),
-            const SizedBox(width: 10),
-            InkWell(
-              onTap: () => _showSelectionSheet(
-                title: 'Species',
-                options: speciesOptions,
-                selectedValue: _selectedSpecies,
-                allLabel: 'All Species',
-                onSelected: (value) {
-                  setState(() => _selectedSpecies = value);
-                },
-              ),
-              borderRadius: BorderRadius.circular(25),
-              child: _filterButton(
-                Icons.eco,
-                _selectedSpecies ?? 'Species',
-                isDropdown: true,
-              ),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          _filterButton(Icons.filter_list, 'Filters'),
+          InkWell(
+            onTap: () => _showSelectionSheet(
+              title: 'Species',
+              options: speciesOptions,
+              selectedValue: _selectedSpecies,
+              allLabel: 'All Species',
+              onSelected: (value) {
+                setState(() => _selectedSpecies = value);
+              },
             ),
-            const SizedBox(width: 10),
-            InkWell(
-              onTap: () => _showSelectionSheet(
-                title: 'Health',
-                options: const ['Healthy', 'Needs Attention', 'At Risk'],
-                selectedValue: _selectedHealth,
-                allLabel: 'All Health',
-                onSelected: (value) {
-                  setState(() => _selectedHealth = value);
-                },
-              ),
-              borderRadius: BorderRadius.circular(25),
-              child: _filterButton(
-                Icons.favorite,
-                _selectedHealth ?? 'Health',
-                isDropdown: true,
-              ),
+            borderRadius: BorderRadius.circular(25),
+            child: _filterButton(
+              Icons.eco,
+              _selectedSpecies ?? 'Species',
+              isDropdown: true,
             ),
-          ],
-        ),
+          ),
+          InkWell(
+            onTap: () => _showSelectionSheet(
+              title: 'Health',
+              options: const ['Healthy', 'Needs Attention', 'At Risk'],
+              selectedValue: _selectedHealth,
+              allLabel: 'All Health',
+              onSelected: (value) {
+                setState(() => _selectedHealth = value);
+              },
+            ),
+            borderRadius: BorderRadius.circular(25),
+            child: _filterButton(
+              Icons.favorite,
+              _selectedHealth ?? 'Health',
+              isDropdown: true,
+            ),
+          ),
+        ],
       ),
     );
   }

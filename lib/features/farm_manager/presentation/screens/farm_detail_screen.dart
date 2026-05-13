@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/router/route_paths.dart';
 import '../../../../core/providers/connectivity_provider.dart';
 import '../../../../core/providers/firebase_providers.dart';
+import '../../../../shared/widgets/responsive_layout.dart';
 import '../farm_manager_data.dart';
 import '../farm_manager_providers.dart';
 
@@ -423,28 +424,26 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Row(
+                  ResponsiveWrapGrid(
+                    minChildWidth: 150,
+                    maxColumns: latitude != null && longitude != null ? 2 : 1,
+                    spacing: 12,
+                    runSpacing: 12,
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _copyToClipboard(treeId, 'Tree ID'),
-                          icon: const Icon(Icons.copy_outlined),
-                          label: const Text('Copy Tree ID'),
-                        ),
+                      OutlinedButton.icon(
+                        onPressed: () => _copyToClipboard(treeId, 'Tree ID'),
+                        icon: const Icon(Icons.copy_outlined),
+                        label: const Text('Copy Tree ID'),
                       ),
-                      if (latitude != null && longitude != null) ...[
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _openDirections(
-                              latitude: latitude,
-                              longitude: longitude,
-                            ),
-                            icon: const Icon(Icons.route_outlined),
-                            label: const Text('Directions'),
+                      if (latitude != null && longitude != null)
+                        ElevatedButton.icon(
+                          onPressed: () => _openDirections(
+                            latitude: latitude,
+                            longitude: longitude,
                           ),
+                          icon: const Icon(Icons.route_outlined),
+                          label: const Text('Directions'),
                         ),
-                      ],
                     ],
                   ),
                 ],
@@ -767,6 +766,7 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final isOnline = ref.watch(connectivityStatusProvider).value ?? true;
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
     final farm = widget.farm;
     if (farm == null) {
       return Scaffold(
@@ -924,30 +924,28 @@ class _FarmDetailScreenState extends ConsumerState<FarmDetailScreen> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(horizontalPadding),
             sliver: SliverList(
               delegate: SliverChildListDelegate(
                 [
-                  Row(
+                  ResponsiveWrapGrid(
+                    minChildWidth: 150,
+                    maxColumns: 2,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      Expanded(
-                        child: _MetricCard(
-                          title: 'Alerts',
-                          value: '${farm.alertCount}',
-                          icon: Icons.warning_amber_rounded,
-                          color: farm.alertCount == 0
-                              ? Colors.green
-                              : Colors.orange,
-                        ),
+                      _MetricCard(
+                        title: 'Alerts',
+                        value: '${farm.alertCount}',
+                        icon: Icons.warning_amber_rounded,
+                        color:
+                            farm.alertCount == 0 ? Colors.green : Colors.orange,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _MetricCard(
-                          title: 'Scanned',
-                          value: '${farm.scannedTrees}/${farm.totalTrees}',
-                          icon: Icons.sync_outlined,
-                          color: Colors.teal,
-                        ),
+                      _MetricCard(
+                        title: 'Scanned',
+                        value: '${farm.scannedTrees}/${farm.totalTrees}',
+                        icon: Icons.sync_outlined,
+                        color: Colors.teal,
                       ),
                     ],
                   ),
@@ -1280,23 +1278,53 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 300;
+              if (!isCompact) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    if (actionLabel != null && onActionTap != null)
+                      TextButton(
+                        onPressed: onActionTap,
+                        child: Text(actionLabel!),
+                      ),
+                  ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
                   ),
-                ),
-              ),
-              if (actionLabel != null && onActionTap != null)
-                TextButton(
-                  onPressed: onActionTap,
-                  child: Text(actionLabel!),
-                ),
-            ],
+                  if (actionLabel != null && onActionTap != null) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: onActionTap,
+                        child: Text(actionLabel!),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           child,
@@ -1449,6 +1477,7 @@ class _TreePreviewTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = healthColor(health);
+    final isCompact = ResponsiveLayout.isCompact(context, breakpoint: 360);
 
     return InkWell(
       onTap: onTap,
@@ -1460,60 +1489,121 @@ class _TreePreviewTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey.shade200),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.park_outlined, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
+        child: isCompact
+            ? Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    treeId,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.park_outlined, color: color),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              treeId,
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              subtitle,
+                              style: TextStyle(color: Colors.grey.shade700),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: Colors.grey.shade700),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 6,
+                    children: [
+                      Text(
+                        health,
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        issueCount == 0 ? 'No issues' : '$issueCount issues',
+                        style: TextStyle(
+                          color: issueCount == 0
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.park_outlined, color: color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          treeId,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        health,
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        issueCount == 0 ? 'No issues' : '$issueCount issues',
+                        style: TextStyle(
+                          color: issueCount == 0
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  health,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  issueCount == 0 ? 'No issues' : '$issueCount issues',
-                  style: TextStyle(
-                    color: issueCount == 0
-                        ? Colors.green.shade700
-                        : Colors.red.shade700,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1530,6 +1620,31 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context, breakpoint: 360);
+
+    if (isCompact) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(

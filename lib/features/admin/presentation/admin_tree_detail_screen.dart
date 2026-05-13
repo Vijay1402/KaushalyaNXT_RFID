@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/firebase_providers.dart';
+import '../../../shared/widgets/responsive_layout.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
 import 'admin_management_forms.dart';
 import 'admin_management_service.dart';
@@ -191,9 +192,10 @@ class _AdminTreeDetailScreenState extends ConsumerState<AdminTreeDetailScreen> {
             fallback: 'Tree',
           );
           final health = healthLabel(tree['healthStatus']);
+          final horizontalPadding = ResponsiveLayout.pagePadding(context);
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(horizontalPadding),
             children: [
               Container(
                 padding: const EdgeInsets.all(18),
@@ -338,26 +340,25 @@ class _AdminTreeDetailScreenState extends ConsumerState<AdminTreeDetailScreen> {
                 ],
               ),
               const SizedBox(height: 18),
-              Row(
+              ResponsiveWrapGrid(
+                minChildWidth: 150,
+                maxColumns: 2,
+                spacing: 12,
+                runSpacing: 12,
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _isWorking ? null : () => _editTree(tree),
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Edit Tree'),
-                    ),
+                  OutlinedButton.icon(
+                    onPressed: _isWorking ? null : () => _editTree(tree),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit Tree'),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _isWorking ? null : () => _deleteTree(tree),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                      ),
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('Delete Tree'),
+                  ElevatedButton.icon(
+                    onPressed: _isWorking ? null : () => _deleteTree(tree),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
                     ),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Delete Tree'),
                   ),
                 ],
               ),
@@ -419,6 +420,31 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context, breakpoint: 360);
+
+    if (isCompact) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(

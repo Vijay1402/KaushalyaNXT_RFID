@@ -18,6 +18,7 @@ import '../../../core/providers/connectivity_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/services/local_cache_service.dart';
 import '../../../data/models/tree_model.dart';
+import '../../../shared/widgets/responsive_layout.dart';
 import 'tree_controller.dart';
 import '../../rfid/rfid_scan_screen.dart';
 import 'tree_history_screen.dart';
@@ -421,22 +422,21 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Row(
+                    ResponsiveWrapGrid(
+                      minChildWidth: 150,
+                      maxColumns: 2,
+                      spacing: 10,
+                      runSpacing: 10,
                       children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => pickImage(ImageSource.camera),
-                            icon: const Icon(Icons.photo_camera_outlined),
-                            label: const Text('Camera'),
-                          ),
+                        OutlinedButton.icon(
+                          onPressed: () => pickImage(ImageSource.camera),
+                          icon: const Icon(Icons.photo_camera_outlined),
+                          label: const Text('Camera'),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => pickImage(ImageSource.gallery),
-                            icon: const Icon(Icons.photo_library_outlined),
-                            label: const Text('Gallery'),
-                          ),
+                        OutlinedButton.icon(
+                          onPressed: () => pickImage(ImageSource.gallery),
+                          icon: const Icon(Icons.photo_library_outlined),
+                          label: const Text('Gallery'),
                         ),
                       ],
                     ),
@@ -854,12 +854,15 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         /// TOP CARDS
-                        Row(
+                        ResponsiveWrapGrid(
+                          minChildWidth: 220,
+                          maxColumns: 2,
+                          spacing: 10,
+                          runSpacing: 10,
                           children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 250,
-                                child: FutureBuilder<Map<String, dynamic>?>(
+                            SizedBox(
+                              height: 250,
+                              child: FutureBuilder<Map<String, dynamic>?>(
                                   future: _getTagDataFuture(
                                     data,
                                     isOnline: isOnline,
@@ -929,12 +932,9 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
                                   },
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: SizedBox(
-                                height: 250,
-                                child: _infoCard(
+                            SizedBox(
+                              height: 250,
+                              child: _infoCard(
                                   color: const Color(0xFFE3F2FD),
                                   children: [
                                     const Text(
@@ -1011,7 +1011,6 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
                                   ],
                                 ),
                               ),
-                            ),
                           ],
                         ),
 
@@ -1086,38 +1085,36 @@ class _TreeDetailScreenState extends ConsumerState<TreeDetailScreen> {
             /// BUTTONS
             bottomNavigationBar: Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(
+              child: ResponsiveWrapGrid(
+                minChildWidth: 150,
+                maxColumns: 2,
+                spacing: 10,
+                runSpacing: 10,
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: docId.isEmpty
-                          ? null
-                          : () => _showReportIssue(
-                                treeDocId: docId,
-                                treeId: treeIdText,
-                                species: species,
-                                healthStatus: health,
-                                ownerName: ownerName,
-                              ),
-                      icon: const Icon(Icons.report_problem_outlined),
-                      label: const Text("Report Issue"),
-                    ),
+                  OutlinedButton.icon(
+                    onPressed: docId.isEmpty
+                        ? null
+                        : () => _showReportIssue(
+                              treeDocId: docId,
+                              treeId: treeIdText,
+                              species: species,
+                              healthStatus: health,
+                              ownerName: ownerName,
+                            ),
+                    icon: const Icon(Icons.report_problem_outlined),
+                    label: const Text("Report Issue"),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RFIDScanScreen(),
-                          ),
-                        );
-                      },
-                      child: const Text("Update"),
-                    ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RFIDScanScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text("Update"),
                   ),
                 ],
               ),
@@ -1359,32 +1356,36 @@ class TagDetailsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _tagRow(
+                    context,
                     'Tree ID',
                     hasTagData
                         ? (tagData!['treeId'] ?? treeId).toString()
                         : '-'),
                 _tagRow(
+                    context,
                     'Health',
                     hasTagData
                         ? healthLabelBuilder(tagData!['healthStatus'])
                         : '-'),
-                _tagRow('Age',
+                _tagRow(context, 'Age',
                     hasTagData ? '${tagData!['treeAgeYears'] ?? 0} yrs' : '-'),
                 _tagRow(
+                    context,
                     'Farmer',
                     hasTagData
                         ? (tagData!['farmerName'] ?? '-').toString()
                         : '-'),
-                _tagRow('Yield',
+                _tagRow(context, 'Yield',
                     hasTagData ? '${tagData!['lastYieldKg'] ?? 0} kg' : '-'),
                 _tagRow(
+                    context,
                     'Last Scan',
                     hasTagData
                         ? lastScanLabelBuilder(tagData!['lastInspectionUnix'])
                         : '-'),
-                _tagRow('EPC',
+                _tagRow(context, 'EPC',
                     hasTagData ? (tagData!['epc'] ?? '-').toString() : '-'),
-                _tagRow('TID',
+                _tagRow(context, 'TID',
                     hasTagData ? (tagData!['tid'] ?? '-').toString() : '-'),
                 if (!hasTagData) ...[
                   const SizedBox(height: 12),
@@ -1401,7 +1402,26 @@ class TagDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _tagRow(String label, String value) {
+  Widget _tagRow(BuildContext context, String label, String value) {
+    final isCompact = ResponsiveLayout.isCompact(context, breakpoint: 360);
+
+    if (isCompact) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text(value),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(

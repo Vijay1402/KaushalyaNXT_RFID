@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/localization/app_language.dart';
 import '../../../core/services/local_cache_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
@@ -77,7 +78,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('Activity Log'),
+        title: Text(context.tr('activityLog')),
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
       ),
@@ -93,13 +94,14 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
               const SizedBox(height: 18),
               if (_selectedFilter != _ActivityFilter.issues) ...[
                 _sectionHeader(
-                  title: 'Scan History',
+                  title: context.tr('Scan History'),
                   count: scans.length,
                   color: Colors.green.shade700,
                 ),
                 const SizedBox(height: 10),
                 if (scans.isEmpty)
-                  const _EmptyCard(message: 'No scan history available yet.')
+                  _EmptyCard(
+                      message: context.tr('No scan history available yet.'))
                 else
                   ...scans.map(_ScanLogCard.new),
                 if (_selectedFilter == _ActivityFilter.all)
@@ -107,13 +109,14 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
               ],
               if (_selectedFilter != _ActivityFilter.scans) ...[
                 _sectionHeader(
-                  title: 'Farmer Issues',
+                  title: context.tr('Farmer Issues'),
                   count: issues.length,
                   color: Colors.orange.shade700,
                 ),
                 const SizedBox(height: 10),
                 if (issues.isEmpty)
-                  const _EmptyCard(message: 'No issue reports available yet.')
+                  _EmptyCard(
+                      message: context.tr('No issue reports available yet.'))
                 else
                   ...issues.map(_IssueLogCard.new),
               ],
@@ -134,19 +137,19 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
       runSpacing: 10,
       children: [
         _filterButton(
-          label: 'All',
+          label: context.tr('All'),
           count: scanCount + issueCount,
           filter: _ActivityFilter.all,
           color: Colors.blue.shade700,
         ),
         _filterButton(
-          label: 'Scan History',
+          label: context.tr('Scan History'),
           count: scanCount,
           filter: _ActivityFilter.scans,
           color: Colors.green.shade700,
         ),
         _filterButton(
-          label: 'Issues',
+          label: context.tr('Issues'),
           count: issueCount,
           filter: _ActivityFilter.issues,
           color: Colors.orange.shade700,

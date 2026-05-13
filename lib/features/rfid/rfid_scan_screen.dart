@@ -1,6 +1,8 @@
 // ============================================================
 //  lib/features/rfid/rfid_scan_screen.dart   (NEW FILE)
 // ============================================================
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +17,7 @@ import 'tag_protocol.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/router/route_paths.dart';
 import '../../core/services/local_cache_service.dart';
+import '../../shared/widgets/responsive_layout.dart';
 import '../farmer/tree_details/tree_controller.dart';
 
 // ── States the scan screen moves through ─────────────────────────────────────
@@ -313,41 +316,46 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
+              scrollable: true,
               title: const Text('Scanner Setup'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Select frequency region'),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<int>(
-                    initialValue: frequencyMode,
-                    items: const [
-                      DropdownMenuItem(
-                          value: 0x04, child: Text('Europe (0x04)')),
-                      DropdownMenuItem(
-                          value: 0x08, child: Text('United States (0x08)')),
-                    ],
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setLocal(() => frequencyMode = v);
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  const Text('Tag scanning mode'),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<bool>(
-                    initialValue: multiTagMode,
-                    items: const [
-                      DropdownMenuItem(value: false, child: Text('Single tag')),
-                      DropdownMenuItem(value: true, child: Text('Multi tag')),
-                    ],
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setLocal(() => multiTagMode = v);
-                    },
-                  ),
-                ],
+              content: SizedBox(
+                width: ResponsiveLayout.dialogWidth(ctx),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Select frequency region'),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<int>(
+                      initialValue: frequencyMode,
+                      items: const [
+                        DropdownMenuItem(
+                            value: 0x04, child: Text('Europe (0x04)')),
+                        DropdownMenuItem(
+                            value: 0x08, child: Text('United States (0x08)')),
+                      ],
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setLocal(() => frequencyMode = v);
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    const Text('Tag scanning mode'),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<bool>(
+                      initialValue: multiTagMode,
+                      items: const [
+                        DropdownMenuItem(
+                            value: false, child: Text('Single tag')),
+                        DropdownMenuItem(value: true, child: Text('Multi tag')),
+                      ],
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setLocal(() => multiTagMode = v);
+                      },
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -394,7 +402,7 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
         return AlertDialog(
           title: const Text('Select RFID Scanner'),
           content: SizedBox(
-            width: double.maxFinite,
+            width: ResponsiveLayout.dialogWidth(ctx, maxWidth: 460),
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: devices.length,
@@ -1828,20 +1836,60 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // ── Status banner ──
-            _buildStatusBanner(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final horizontalPadding = ResponsiveLayout.pagePadding(context);
+            final isLandscape = constraints.maxWidth > constraints.maxHeight;
 
-            // ── Big scan button (centred in remaining space) ──
-            Expanded(
-              child: Center(child: _buildScanButton()),
-            ),
+            if (isLandscape) {
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  16,
+                  horizontalPadding,
+                  24,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildStatusBanner(),
+                            const SizedBox(height: 16),
+                            _buildBottomHints(),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      flex: 4,
+                      child: Center(child: _buildScanButton()),
+                    ),
+                  ],
+                ),
+              );
+            }
 
-            // ── Bottom hint row ──
-            _buildBottomHints(),
-            const SizedBox(height: 24),
-          ],
+            return Column(
+              children: [
+                // ── Status banner ──
+                _buildStatusBanner(),
+
+                // ── Big scan button (centred in remaining space) ──
+                Expanded(
+                  child: Center(child: _buildScanButton()),
+                ),
+
+                // ── Bottom hint row ──
+                _buildBottomHints(),
+                const SizedBox(height: 24),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1948,9 +1996,19 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
 
   // ── Pulsing rings + big scan button ─────────────────────────────────────────
   Widget _buildScanButton() {
+    final size = MediaQuery.sizeOf(context);
+    final shortestSide = math.min(size.width, size.height);
+    final preferredSize =
+        shortestSide * (ResponsiveLayout.isLandscape(context) ? 0.62 : 0.72);
+    final outerSize = preferredSize.clamp(190.0, 280.0);
+    final pulseSize = outerSize * 0.86;
+    final ringSize = outerSize * 0.72;
+    final buttonSize = outerSize * 0.56;
+    final iconSize = outerSize * 0.16;
+
     return SizedBox(
-      width: 280,
-      height: 280,
+      width: outerSize,
+      height: outerSize,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -1961,8 +2019,8 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
               builder: (_, __) => Transform.scale(
                 scale: _pulseAnim.value,
                 child: Container(
-                  width: 240,
-                  height: 240,
+                  width: pulseSize,
+                  height: pulseSize,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -1981,8 +2039,8 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
               builder: (_, __) => Transform.scale(
                 scale: _pulseAnim.value * 0.78,
                 child: Container(
-                  width: 240,
-                  height: 240,
+                  width: pulseSize,
+                  height: pulseSize,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -1996,8 +2054,8 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
 
           // Fixed white ring (always visible)
           Container(
-            width: 200,
-            height: 200,
+            width: ringSize,
+            height: ringSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white,
@@ -2024,8 +2082,8 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
                 : null,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
-              width: 155,
-              height: 155,
+              width: buttonSize,
+              height: buttonSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -2053,10 +2111,10 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
                   _isActive
                       ? RotationTransition(
                           turns: _spinAnim,
-                          child:
-                              Icon(_centerIcon, color: Colors.white, size: 46),
+                          child: Icon(_centerIcon,
+                              color: Colors.white, size: iconSize),
                         )
-                      : Icon(_centerIcon, color: Colors.white, size: 46),
+                      : Icon(_centerIcon, color: Colors.white, size: iconSize),
 
                   const SizedBox(height: 8),
 
@@ -2090,40 +2148,54 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _onReadPressed,
-                    icon: const Icon(Icons.download_rounded),
-                    label: const Text('READ'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade700,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final singleColumn = constraints.maxWidth < 320;
+                final readButton = ElevatedButton.icon(
+                  onPressed: _onReadPressed,
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('READ'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _onWritePressed,
-                    icon: const Icon(Icons.upload_rounded),
-                    label: const Text('WRITE'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange.shade700,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                );
+                final writeButton = ElevatedButton.icon(
+                  onPressed: _onWritePressed,
+                  icon: const Icon(Icons.upload_rounded),
+                  label: const Text('WRITE'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                ),
-              ],
+                );
+
+                if (singleColumn) {
+                  return Column(
+                    children: [
+                      SizedBox(width: double.infinity, child: readButton),
+                      const SizedBox(height: 12),
+                      SizedBox(width: double.infinity, child: writeButton),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: readButton),
+                    const SizedBox(width: 12),
+                    Expanded(child: writeButton),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -2132,8 +2204,10 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      child: Wrap(
+        alignment: WrapAlignment.spaceEvenly,
+        spacing: 18,
+        runSpacing: 12,
         children: [
           _HintChip(
             icon: Icons.wifi_rounded,

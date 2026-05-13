@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router/route_paths.dart';
+import '../../../core/localization/app_language.dart';
+import '../../../shared/widgets/responsive_layout.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -98,120 +100,138 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
+    final cardPadding = ResponsiveLayout.adaptiveSpace(
+      context,
+      min: 14,
+      max: 20,
+    );
+    final headingSize = ResponsiveLayout.fontSize(context, 22);
 
     return Scaffold(
       backgroundColor: Colors.grey[200],
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Column(
-            children: [
-              const SizedBox(height: 24),
-              const Text(
-                'Welcome Back',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
+      body: ResponsiveScrollBody(
+        maxWidth: 420,
+        fillViewport: true,
+        padding: ResponsiveLayout.pageInsets(
+          context,
+          top: 24,
+          bottom: 24,
+          compact: 18,
+          regular: 24,
+          wide: 28,
+        ),
+        child: Column(
+          children: [
+            SizedBox(height: ResponsiveLayout.adaptiveSpace(context)),
+            Text(
+              context.tr('Welcome Back'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: headingSize,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Sign in with your registered email address.',
-                style: TextStyle(color: Colors.black54),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black12, blurRadius: 6),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    _inputField(
-                      controller: emailController,
-                      hint: 'Email Address',
-                      errorText: emailError,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 15),
-                    _inputField(
-                      controller: passwordController,
-                      hint: 'Password',
-                      isPassword: true,
-                      obscure: obscurePassword,
-                      onToggle: () {
-                        setState(() => obscurePassword = !obscurePassword);
-                      },
-                      errorText: passwordError,
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => context.push('/forgot-password'),
-                        child: const Text(
-                          'Forget password?',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              authState.isLoading
-                  ? const CircularProgressIndicator()
-                  : SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green[700],
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                        onPressed: _loginWithEmail,
-                        child: const Text(
-                          'LOG IN',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(child: Divider(color: Colors.grey[400])),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
-                    child: Text('OR'),
-                  ),
-                  Expanded(child: Divider(color: Colors.grey[400])),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              context.tr('Sign in with your registered email address.'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.black54),
+            ),
+            SizedBox(height: ResponsiveLayout.adaptiveSpace(context)),
+            Container(
+              padding: EdgeInsets.all(cardPadding),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black12, blurRadius: 6),
                 ],
               ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Column(
                 children: [
-                  const Text("Don't have an account? "),
-                  GestureDetector(
-                    onTap: () => context.go('/register'),
-                    child: const Text(
-                      'SIGN UP',
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontWeight: FontWeight.bold,
+                  _inputField(
+                    controller: emailController,
+                    hint: context.tr('Email Address'),
+                    errorText: emailError,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 15),
+                  _inputField(
+                    controller: passwordController,
+                    hint: context.tr('Password'),
+                    isPassword: true,
+                    obscure: obscurePassword,
+                    onToggle: () {
+                      setState(() => obscurePassword = !obscurePassword);
+                    },
+                    errorText: passwordError,
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => context.push('/forgot-password'),
+                      child: Text(
+                        context.tr('Forget password?'),
+                        style: const TextStyle(fontSize: 12),
                       ),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+            SizedBox(height: ResponsiveLayout.adaptiveSpace(context)),
+            authState.isLoading
+                ? const CircularProgressIndicator()
+                : SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green[700],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      onPressed: _loginWithEmail,
+                      child: Text(
+                        context.tr('LOG IN'),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+            SizedBox(height: ResponsiveLayout.adaptiveSpace(context, min: 16)),
+            Row(
+              children: [
+                Expanded(child: Divider(color: Colors.grey[400])),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(context.tr('OR')),
+                ),
+                Expanded(child: Divider(color: Colors.grey[400])),
+              ],
+            ),
+            SizedBox(height: ResponsiveLayout.adaptiveSpace(context, min: 16)),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                Text(context.tr("Don't have an account? ")),
+                GestureDetector(
+                  onTap: () => context.go('/register'),
+                  child: Text(
+                    context.tr('SIGN UP'),
+                    style: const TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

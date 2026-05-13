@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/localization/app_language.dart';
+import '../../../../shared/widgets/responsive_layout.dart';
 import '../farm_manager_data.dart';
 import '../farm_manager_providers.dart';
 
@@ -55,6 +57,7 @@ class _IssueTrackerScreenState extends ConsumerState<IssueTrackerScreen> {
     List<FarmManagerIssue> issues, {
     String? helperMessage,
   }) {
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
     final filteredIssues = issues.where((issue) {
       if (widget.initialFarmId.isNotEmpty ||
           widget.initialFarmLabel.isNotEmpty) {
@@ -120,26 +123,25 @@ class _IssueTrackerScreenState extends ConsumerState<IssueTrackerScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              Row(
+              ResponsiveWrapGrid(
+                minChildWidth: 150,
+                maxColumns: 2,
+                spacing: 10,
+                runSpacing: 10,
                 children: [
-                  Expanded(
-                    child: _TopCard(
-                      title: 'Total Issues',
-                      count: '$totalCount',
-                      subtitle: 'Across managed farms',
-                      color: Colors.white,
-                      textColor: Colors.green.shade900,
-                    ),
+                  _TopCard(
+                    title: 'Total Issues',
+                    count: '$totalCount',
+                    subtitle: 'Across managed farms',
+                    color: Colors.white,
+                    textColor: Colors.green.shade900,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _TopCard(
-                      title: 'Critical',
-                      count: '$criticalCount',
-                      subtitle: 'Needs attention',
-                      color: Colors.red.shade50,
-                      textColor: Colors.red.shade900,
-                    ),
+                  _TopCard(
+                    title: 'Critical',
+                    count: '$criticalCount',
+                    subtitle: 'Needs attention',
+                    color: Colors.red.shade50,
+                    textColor: Colors.red.shade900,
                   ),
                 ],
               ),
@@ -148,7 +150,7 @@ class _IssueTrackerScreenState extends ConsumerState<IssueTrackerScreen> {
         ),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(horizontalPadding),
             children: [
               if (helperMessage != null) ...[
                 Container(
@@ -261,22 +263,47 @@ class _IssueTrackerScreenState extends ConsumerState<IssueTrackerScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Active Issues Feed',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 300;
+                  if (!isCompact) {
+                    return Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Active Issues Feed',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${filteredIssues.length} items',
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Active Issues Feed',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
                       ),
-                    ),
-                  ),
-                  Text(
-                    '${filteredIssues.length} items',
-                    style: TextStyle(color: Colors.grey.shade700),
-                  ),
-                ],
+                      const SizedBox(height: 4),
+                      Text(
+                        '${filteredIssues.length} items',
+                        style: TextStyle(color: Colors.grey.shade700),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 12),
               if (filteredIssues.isEmpty)
@@ -304,7 +331,7 @@ class _IssueTrackerScreenState extends ConsumerState<IssueTrackerScreen> {
       appBar: AppBar(
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
-        title: const Text('Issue Tracker'),
+        title: Text(context.tr('Issue Tracker')),
       ),
       body: overviewAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -478,6 +505,39 @@ class _ProgressRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final value = total == 0 ? 0.0 : count / total;
+    final isCompact = ResponsiveLayout.isCompact(context, breakpoint: 340);
+
+    if (isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                '$count',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: value,
+              minHeight: 10,
+              color: color,
+              backgroundColor: color.withValues(alpha: 0.15),
+            ),
+          ),
+        ],
+      );
+    }
 
     return Row(
       children: [
@@ -561,30 +621,61 @@ class _IssueCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        issue.title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: severityColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        issue.severity,
-                        style: TextStyle(
-                          color: severityColor,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isCompact = constraints.maxWidth < 220;
+                          final badge = Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: severityColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              issue.severity,
+                              style: TextStyle(
+                                color: severityColor,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          );
+
+                          if (!isCompact) {
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    issue.title,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                badge,
+                              ],
+                            );
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                issue.title,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              badge,
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ],

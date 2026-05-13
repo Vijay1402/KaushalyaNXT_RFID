@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../core/localization/app_language.dart';
+import '../../../shared/widgets/responsive_layout.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -40,12 +43,10 @@ class ProfileScreen extends ConsumerWidget {
         leading: showBackButton
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  context.pop();
-                },
+                onPressed: () => context.pop(),
               )
             : null,
-        title: const Text("Profile"),
+        title: Text(context.tr('profile')),
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -56,92 +57,181 @@ class ProfileScreen extends ConsumerWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 1,
                 child: ListTile(
-                  leading: Icon(Icons.notifications_none),
-                  title: Text("Notification Settings"),
+                  leading: const Icon(Icons.notifications_none),
+                  title: Text(context.tr('notificationSettings')),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 2,
                 child: ListTile(
-                  leading: Icon(Icons.help_outline),
-                  title: Text("FAQs"),
+                  leading: const Icon(Icons.help_outline),
+                  title: Text(context.tr('faqs')),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 3,
                 child: ListTile(
-                  leading: Icon(Icons.support_agent),
-                  title: Text("Support"),
+                  leading: const Icon(Icons.support_agent),
+                  title: Text(context.tr('support')),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 4,
                 child: ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text("About App"),
+                  leading: const Icon(Icons.info_outline),
+                  title: Text(context.tr('aboutApp')),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 5,
                 child: ListTile(
-                  leading: Icon(Icons.storage),
-                  title: Text("Local Storage"),
+                  leading: const Icon(Icons.storage),
+                  title: Text(context.tr('localStorage')),
+                ),
+              ),
+              PopupMenuItem(
+                value: 6,
+                child: ListTile(
+                  leading: const Icon(Icons.language),
+                  title: Text(context.tr('language')),
                 ),
               ),
             ],
-
-            /// ✅ ONLY CHANGE (NAVIGATION ADDED)
             onSelected: (value) {
               switch (value) {
                 case 1:
                   context.push('/notification-settings');
                   break;
-
                 case 2:
                   context.push('/faq');
                   break;
-
                 case 3:
                   context.push('/support');
                   break;
-
                 case 4:
                   showAboutAppDialog(context);
                   break;
-
                 case 5:
                   context.push('/local-storage');
+                  break;
+                case 6:
+                  _showLanguageDialog(context, ref);
                   break;
               }
             },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildProfileHeader(userName, userRole, managerCode),
-            const SizedBox(height: 20),
-            _buildInfoCard(
+      body: ResponsiveScrollBody(
+        maxWidth: 920,
+        padding: ResponsiveLayout.pageInsets(
+          context,
+          top: 16,
+          bottom: 24,
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final showTwoColumns = constraints.maxWidth >= 760;
+            final infoCard = _buildInfoCard(
+              context,
               userRole,
               userEmail,
               userPhone,
               managerCode,
               farmManagerName,
               farmManagerCode,
-            ),
-            const SizedBox(height: 20),
-            _buildFarmDetails(),
-            const SizedBox(height: 20),
-            _buildActions(context, ref, authState.isLoading, userName,
-                userEmail, userPhone),
-          ],
+            );
+            final farmDetailsCard = _buildFarmDetails(context);
+
+            return Column(
+              children: [
+                _buildProfileHeader(userName, userRole, managerCode),
+                const SizedBox(height: 20),
+                if (showTwoColumns)
+                  ResponsiveWrapGrid(
+                    minChildWidth: 320,
+                    maxColumns: 2,
+                    spacing: 20,
+                    runSpacing: 20,
+                    children: [
+                      infoCard,
+                      farmDetailsCard,
+                    ],
+                  )
+                else ...[
+                  infoCard,
+                  const SizedBox(height: 20),
+                  farmDetailsCard,
+                ],
+                const SizedBox(height: 20),
+                _buildActions(
+                  context,
+                  ref,
+                  authState.isLoading,
+                  userName,
+                  userEmail,
+                  userPhone,
+                ),
+              ],
+            );
+          },
         ),
       ),
+    );
+  }
+
+  Future<void> _showLanguageDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final selectedLocale = ref.read(appLanguageProvider);
+    final selectedCode = selectedLocale.languageCode;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(context.tr('chooseLanguage')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: supportedAppLanguages.map((language) {
+              final isSelected = language.code == selectedCode;
+
+              return ListTile(
+                onTap: () async {
+                  await ref
+                      .read(appLanguageProvider.notifier)
+                      .setLanguage(language.code);
+
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                  }
+                },
+                leading: Icon(
+                  isSelected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: isSelected ? Colors.green.shade700 : null,
+                ),
+                title: Text(language.nativeName),
+                subtitle: Text(language.name),
+                trailing: isSelected
+                    ? Icon(Icons.check_circle, color: Colors.green.shade700)
+                    : null,
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(context.tr('cancel')),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -158,65 +248,53 @@ class ProfileScreen extends ConsumerWidget {
         ),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 35,
-            backgroundColor: Colors.white,
-            child: Icon(Icons.person, size: 40, color: Colors.green),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 6,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 360;
+
+          return compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      userName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                    const CircleAvatar(
+                      radius: 35,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.person, size: 40, color: Colors.green),
+                    ),
+                    const SizedBox(height: 16),
+                    _ProfileHeaderText(
+                      userName: userName,
+                      userRole: userRole,
+                      managerCode: managerCode,
+                      formatRoleLabel: _formatRoleLabel,
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 35,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.person, size: 40, color: Colors.green),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _ProfileHeaderText(
+                        userName: userName,
+                        userRole: userRole,
+                        managerCode: managerCode,
+                        formatRoleLabel: _formatRoleLabel,
                       ),
                     ),
-                    if (managerCode.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          managerCode,
-                          style: TextStyle(
-                            color: Colors.green.shade700,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
                   ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _formatRoleLabel(userRole),
-                  style: const TextStyle(color: Colors.white70),
-                ),
-              ],
-            ),
-          ),
-        ],
+                );
+        },
       ),
     );
   }
 
   Widget _buildInfoCard(
+    BuildContext context,
     String userRole,
     String userEmail,
     String userPhone,
@@ -225,27 +303,30 @@ class ProfileScreen extends ConsumerWidget {
     String farmManagerCode,
   ) {
     return _card(
-      title: "Personal Information",
+      title: context.tr('personalInformation'),
       children: [
-        _InfoRow(icon: Icons.phone, label: "Phone", value: userPhone),
-        const _InfoRow(
-            icon: Icons.location_on,
-            label: "Location",
-            value: "Karnataka, India"),
-        _InfoRow(icon: Icons.email, label: "Email", value: userEmail),
+        _InfoRow(
+            icon: Icons.phone, label: context.tr('phone'), value: userPhone),
+        _InfoRow(
+          icon: Icons.location_on,
+          label: context.tr('location'),
+          value: 'Karnataka, India',
+        ),
+        _InfoRow(
+            icon: Icons.email, label: context.tr('email'), value: userEmail),
         if (userRole.trim().toLowerCase() == 'farm_manager' &&
             managerCode.isNotEmpty)
           _InfoRow(
             icon: Icons.badge_outlined,
-            label: "Manager Code",
+            label: context.tr('managerCode'),
             value: managerCode,
           ),
         if (userRole.trim().toLowerCase() == 'farmer')
           _InfoRow(
             icon: Icons.supervisor_account_outlined,
-            label: "Farm Manager",
+            label: context.tr('farmManager'),
             value: farmManagerName.isEmpty
-                ? "Not linked"
+                ? context.tr('notLinked')
                 : (farmManagerCode.isEmpty
                     ? farmManagerName
                     : "$farmManagerName ($farmManagerCode)"),
@@ -254,17 +335,25 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildFarmDetails() {
+  Widget _buildFarmDetails(BuildContext context) {
     return _card(
-      title: "Farm Details",
-      children: const [
-        _InfoRow(icon: Icons.landscape, label: "Land Size", value: "5 Acres"),
-        _InfoRow(icon: Icons.park, label: "Total Trees", value: "120"),
-        _InfoRow(icon: Icons.eco, label: "Main Crops", value: "Mango, Coconut"),
+      title: context.tr('farmDetails'),
+      children: [
         _InfoRow(
-            icon: Icons.water_drop,
-            label: "Irrigation",
-            value: "Drip Irrigation"),
+            icon: Icons.landscape,
+            label: context.tr('landSize'),
+            value: "5 Acres"),
+        _InfoRow(
+            icon: Icons.park, label: context.tr('totalTrees'), value: "120"),
+        _InfoRow(
+            icon: Icons.eco,
+            label: context.tr('mainCrops'),
+            value: "Mango, Coconut"),
+        _InfoRow(
+          icon: Icons.water_drop,
+          label: context.tr('irrigation'),
+          value: "Drip Irrigation",
+        ),
       ],
     );
   }
@@ -292,7 +381,7 @@ class ProfileScreen extends ConsumerWidget {
                       userPhone: userPhone,
                     ),
             icon: const Icon(Icons.edit),
-            label: const Text("Edit Profile"),
+            label: Text(context.tr('editProfile')),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
               foregroundColor: Colors.white,
@@ -307,7 +396,7 @@ class ProfileScreen extends ConsumerWidget {
             onPressed:
                 isLoading ? null : () => _sendPasswordReset(context, ref),
             icon: const Icon(Icons.lock_reset),
-            label: const Text("Reset Password"),
+            label: Text(context.tr('resetPassword')),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
               foregroundColor: Colors.white,
@@ -321,7 +410,7 @@ class ProfileScreen extends ConsumerWidget {
           child: ElevatedButton.icon(
             onPressed: () => _confirmLogout(context, ref),
             icon: const Icon(Icons.logout),
-            label: const Text("Logout"),
+            label: Text(context.tr('logout')),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
@@ -356,11 +445,13 @@ class ProfileScreen extends ConsumerWidget {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              scrollable: true,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
               title: const Text("Edit Profile"),
-              content: SingleChildScrollView(
+              content: SizedBox(
+                width: ResponsiveLayout.dialogWidth(dialogContext),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -516,7 +607,6 @@ class ProfileScreen extends ConsumerWidget {
               await notifier.logout();
 
               if (!context.mounted) return;
-
               context.go('/login');
             },
             child: const Text("Logout"),
@@ -542,9 +632,10 @@ class ProfileScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 12),
           ...children,
         ],
@@ -589,30 +680,120 @@ class ProfileScreen extends ConsumerWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
   const _InfoRow({
     required this.icon,
     required this.label,
     required this.value,
   });
 
+  final IconData icon;
+  final String label;
+  final String value;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.green),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(label, style: TextStyle(color: Colors.grey.shade600)),
-          ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 300;
+        final labelWidget = Text(
+          label,
+          style: TextStyle(color: Colors.grey.shade600),
+        );
+        final valueWidget = Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+          textAlign: compact ? TextAlign.left : TextAlign.right,
+        );
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(icon, size: 20, color: Colors.green),
+                        const SizedBox(width: 12),
+                        Expanded(child: labelWidget),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    valueWidget,
+                  ],
+                )
+              : Row(
+                  children: [
+                    Icon(icon, size: 20, color: Colors.green),
+                    const SizedBox(width: 12),
+                    Expanded(child: labelWidget),
+                    const SizedBox(width: 12),
+                    Flexible(child: valueWidget),
+                  ],
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _ProfileHeaderText extends StatelessWidget {
+  const _ProfileHeaderText({
+    required this.userName,
+    required this.userRole,
+    required this.managerCode,
+    required this.formatRoleLabel,
+  });
+
+  final String userName;
+  final String userRole;
+  final String managerCode;
+  final String Function(String) formatRoleLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            Text(
+              userName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (managerCode.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  managerCode,
+                  style: TextStyle(
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          formatRoleLabel(userRole),
+          style: const TextStyle(color: Colors.white70),
+        ),
+      ],
     );
   }
 }
@@ -625,60 +806,57 @@ void showAboutAppDialog(BuildContext context) {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              /// TITLE
-              const Text(
-                "Agri App",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: ResponsiveLayout.dialogWidth(context, maxWidth: 420),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Agri App",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-
-              const SizedBox(height: 5),
-
-              /// VERSION
-              const Text(
-                "1.0",
-                style: TextStyle(color: Colors.grey),
-              ),
-
-              const SizedBox(height: 20),
-
-              /// DESCRIPTION
-              const Text(
-                "Helping farmers digitally 🌱",
-                style: TextStyle(fontSize: 16),
-              ),
-
-              const SizedBox(height: 30),
-
-              /// BUTTONS
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      showLicensePage(
-                        context: context,
-                        applicationName: "Agri App",
-                        applicationVersion: "1.0",
-                      );
-                    },
-                    child: const Text("View licenses"),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text("Close"),
-                  ),
-                ],
-              )
-            ],
+                const SizedBox(height: 5),
+                const Text(
+                  "1.0",
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "Helping farmers digitally",
+                  style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 24),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        showLicensePage(
+                          context: context,
+                          applicationName: "Agri App",
+                          applicationVersion: "1.0",
+                        );
+                      },
+                      child: const Text("View licenses"),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Close"),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       );

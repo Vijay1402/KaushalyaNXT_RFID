@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'app/router/router_provider.dart';
+import 'core/localization/app_language.dart';
 import 'core/providers/firebase_providers.dart';
 import 'core/services/offline_sync_service.dart';
 import 'features/auth/providers/auth_provider.dart';
@@ -77,9 +79,19 @@ class _MyAppState extends ConsumerState<MyApp> {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    final locale = ref.watch(appLanguageProvider);
 
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
+      locale: locale,
+      supportedLocales:
+          supportedAppLanguages.map((language) => language.locale).toList(),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
       routerConfig: router,
     );
   }

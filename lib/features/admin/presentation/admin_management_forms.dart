@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/widgets/responsive_layout.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
 
 class AdminFarmFormData {
@@ -225,7 +226,7 @@ class _AdminFarmFormDialogState extends State<_AdminFarmFormDialog> {
     return AlertDialog(
       title: Text(widget.initialData == null ? 'Add Farm' : 'Edit Farm'),
       content: SizedBox(
-        width: 420,
+        width: ResponsiveLayout.dialogWidth(context),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -279,27 +280,25 @@ class _AdminFarmFormDialogState extends State<_AdminFarmFormDialog> {
                   label: 'Manager User ID',
                 ),
                 const SizedBox(height: 12),
-                Row(
+                ResponsiveWrapGrid(
+                  minChildWidth: 150,
+                  maxColumns: 2,
+                  spacing: 10,
                   children: [
-                    Expanded(
-                      child: _AdminFormField(
-                        controller: _latitudeController,
-                        label: 'Latitude',
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
+                    _AdminFormField(
+                      controller: _latitudeController,
+                      label: 'Latitude',
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _AdminFormField(
-                        controller: _longitudeController,
-                        label: 'Longitude',
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
+                    _AdminFormField(
+                      controller: _longitudeController,
+                      label: 'Longitude',
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
                       ),
                     ),
                   ],
@@ -436,7 +435,7 @@ class _AdminTreeFormDialogState extends State<_AdminTreeFormDialog> {
     return AlertDialog(
       title: Text(widget.initialData == null ? 'Add Tree' : 'Edit Tree'),
       content: SizedBox(
-        width: 420,
+        width: ResponsiveLayout.dialogWidth(context),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -507,23 +506,21 @@ class _AdminTreeFormDialogState extends State<_AdminTreeFormDialog> {
                   },
                 ),
                 const SizedBox(height: 12),
-                Row(
+                ResponsiveWrapGrid(
+                  minChildWidth: 150,
+                  maxColumns: 2,
+                  spacing: 10,
                   children: [
-                    Expanded(
-                      child: _AdminFormField(
-                        controller: _ageController,
-                        label: 'Age (Years)',
-                        keyboardType: TextInputType.number,
-                      ),
+                    _AdminFormField(
+                      controller: _ageController,
+                      label: 'Age (Years)',
+                      keyboardType: TextInputType.number,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _AdminFormField(
-                        controller: _yieldController,
-                        label: 'Last Yield (Kg)',
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
+                    _AdminFormField(
+                      controller: _yieldController,
+                      label: 'Last Yield (Kg)',
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
                     ),
                   ],
@@ -534,27 +531,25 @@ class _AdminTreeFormDialogState extends State<_AdminTreeFormDialog> {
                   label: 'Harvest Month',
                 ),
                 const SizedBox(height: 12),
-                Row(
+                ResponsiveWrapGrid(
+                  minChildWidth: 150,
+                  maxColumns: 2,
+                  spacing: 10,
                   children: [
-                    Expanded(
-                      child: _AdminFormField(
-                        controller: _latitudeController,
-                        label: 'Latitude',
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
+                    _AdminFormField(
+                      controller: _latitudeController,
+                      label: 'Latitude',
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _AdminFormField(
-                        controller: _longitudeController,
-                        label: 'Longitude',
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
+                    _AdminFormField(
+                      controller: _longitudeController,
+                      label: 'Longitude',
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
                       ),
                     ),
                   ],

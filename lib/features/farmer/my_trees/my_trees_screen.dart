@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:kaushalyanxt_rfid/features/farmer/tree_details/tree_controller.dart';
 
+import '../../../core/localization/app_language.dart';
+import '../../../shared/widgets/responsive_layout.dart';
+
 class MyTreesScreen extends ConsumerStatefulWidget {
   const MyTreesScreen({super.key});
 
@@ -61,11 +64,12 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
   @override
   Widget build(BuildContext context) {
     final treesAsync = ref.watch(treesProvider);
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text("My Trees"),
+        title: Text(context.tr('myTrees')),
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,
         actions: [
@@ -75,271 +79,325 @@ class _MyTreesScreenState extends ConsumerState<MyTreesScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          /// SEARCH + CHIPS
-          Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: "Search by Tree ID, Location...",
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Keep the search/filter controls outside the list so the list
+            // can use all remaining height without introducing nested scrolls.
+            Container(
+              margin: EdgeInsets.all(horizontalPadding),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
                   ),
-                  onChanged: (val) {
-                    setState(() => search = val.toLowerCase());
-                  },
-                ),
-                const SizedBox(height: 12),
-                treesAsync.when(
-                  data: (trees) {
-                    final all = trees.length;
+                ],
+              ),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: context.tr('Search by Tree ID, Location...'),
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onChanged: (val) {
+                      setState(() => search = val.toLowerCase());
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  treesAsync.when(
+                    data: (trees) {
+                      final all = trees.length;
 
-                    final healthy = trees
-                        .where((data) =>
-                            _statusLabel(data['healthStatus']?.toString()) ==
-                            "Healthy")
-                        .length;
+                      final healthy = trees
+                          .where((data) =>
+                              _statusLabel(data['healthStatus']?.toString()) ==
+                              "Healthy")
+                          .length;
 
-                    final need = trees
-                        .where((data) =>
-                            _statusLabel(data['healthStatus']?.toString()) ==
-                            "NeedsAttention")
-                        .length;
+                      final need = trees
+                          .where((data) =>
+                              _statusLabel(data['healthStatus']?.toString()) ==
+                              "NeedsAttention")
+                          .length;
 
-                    final risk = trees
-                        .where((data) =>
-                            _statusLabel(data['healthStatus']?.toString()) ==
-                            "AtRisk")
-                        .length;
+                      final risk = trees
+                          .where((data) =>
+                              _statusLabel(data['healthStatus']?.toString()) ==
+                              "AtRisk")
+                          .length;
 
-                    return Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        _chip("All", "All ($all)", Colors.green),
-                        _chip("Healthy", "Healthy ($healthy)", Colors.green),
-                        _chip("NeedsAttention", "Need Attention ($need)",
-                            Colors.orange),
-                        _chip("AtRisk", "At Risk ($risk)", Colors.red),
-                      ],
-                    );
-                  },
-                  loading: () => const SizedBox(),
-                  error: (_, __) => const SizedBox(),
-                ),
-              ],
-            ),
-          ),
-
-          /// TREE LIST
-          Expanded(
-            child: treesAsync.when(
-              data: (trees) {
-                final docs = trees.where((data) {
-                  final id = (data['treeId'] ?? "").toString().toLowerCase();
-                  final loc = (data['location'] ?? "").toString().toLowerCase();
-                  final health = _statusLabel(data['healthStatus']);
-
-                  final matchSearch =
-                      id.contains(search) || loc.contains(search);
-
-                  final matchFilter =
-                      selectedFilter == "All" || health == selectedFilter;
-
-                  /// AGE FILTER
-                  bool matchAge = true;
-                  if (selectedAge.isNotEmpty) {
-                    final age = (data['treeAge'] ?? 0);
-
-                    switch (selectedAge) {
-                      case "0-1":
-                        matchAge = age >= 0 && age <= 1;
-                        break;
-                      case "1-5":
-                        matchAge = age > 1 && age <= 5;
-                        break;
-                      case "5-10":
-                        matchAge = age > 5 && age <= 10;
-                        break;
-                      case "10-20":
-                        matchAge = age > 10 && age <= 20;
-                        break;
-                      case "20+":
-                        matchAge = age > 20;
-                        break;
-                    }
-                  }
-
-                  /// MONTH
-                  bool matchMonth = true;
-                  if (selectedMonth.isNotEmpty) {
-                    matchMonth = (data['harvestMonth'] ?? "") == selectedMonth;
-                  }
-
-                  /// SCAN
-                  bool matchScan = true;
-                  if (selectedScan.isNotEmpty && selectedScan != "All") {
-                    final isScanned = data['isScanned'] ?? false;
-
-                    matchScan = selectedScan == "Scanned"
-                        ? isScanned == true
-                        : isScanned == false;
-                  }
-
-                  return matchSearch &&
-                      matchFilter &&
-                      matchAge &&
-                      matchMonth &&
-                      matchScan;
-                }).toList();
-
-                // If navigated here with ?treeId=..., auto-open that tree once found.
-                if (_routeTreeId.isNotEmpty && !_autoOpenedFromRoute) {
-                  final wanted = _routeTreeId.toLowerCase();
-                  Map<String, dynamic>? matchDoc;
-                  for (final d in trees) {
-                    final data = d;
-                    final id = (data['treeId'] ?? "").toString().toLowerCase();
-                    if (id == wanted) {
-                      matchDoc = d;
-                      break;
-                    }
-                  }
-                  if (matchDoc != null) {
-                    _autoOpenedFromRoute = true;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (!mounted) return;
-                      context.pushNamed(
-                        'treeDetails',
-                        extra: treeDocIdOf(matchDoc!),
-                        queryParameters: const {'source': 'rfid'},
+                      return Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _chip("All", "${context.tr('All')} ($all)",
+                              Colors.green),
+                          _chip(
+                              "Healthy",
+                              "${context.tr('healthy')} ($healthy)",
+                              Colors.green),
+                          _chip(
+                            "NeedsAttention",
+                            "${context.tr('needAttention')} ($need)",
+                            Colors.orange,
+                          ),
+                          _chip("AtRisk", "${context.tr('At Risk')} ($risk)",
+                              Colors.red),
+                        ],
                       );
-                    });
-                  }
-                }
-
-                if (docs.isEmpty) {
-                  return const Center(child: Text("No Trees Found"));
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  itemCount: docs.length,
-                  itemBuilder: (_, i) {
-                    final data = docs[i];
-
-                    final id = data['treeId'] ?? '';
-                    final loc = data['location'] ?? '';
-                    final species = data['species'] ?? '';
+                    },
+                    loading: () => const SizedBox(),
+                    error: (_, __) => const SizedBox(),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: treesAsync.when(
+                data: (trees) {
+                  final docs = trees.where((data) {
+                    final id = (data['treeId'] ?? "").toString().toLowerCase();
+                    final loc =
+                        (data['location'] ?? "").toString().toLowerCase();
                     final health = _statusLabel(data['healthStatus']);
-                    final date = _formatDate(data['lastinspectiondate']);
 
-                    return GestureDetector(
-                      onTap: () {
+                    final matchSearch =
+                        id.contains(search) || loc.contains(search);
+
+                    final matchFilter =
+                        selectedFilter == "All" || health == selectedFilter;
+
+                    /// AGE FILTER
+                    bool matchAge = true;
+                    if (selectedAge.isNotEmpty) {
+                      final age = (data['treeAge'] ?? 0);
+
+                      switch (selectedAge) {
+                        case "0-1":
+                          matchAge = age >= 0 && age <= 1;
+                          break;
+                        case "1-5":
+                          matchAge = age > 1 && age <= 5;
+                          break;
+                        case "5-10":
+                          matchAge = age > 5 && age <= 10;
+                          break;
+                        case "10-20":
+                          matchAge = age > 10 && age <= 20;
+                          break;
+                        case "20+":
+                          matchAge = age > 20;
+                          break;
+                      }
+                    }
+
+                    /// MONTH
+                    bool matchMonth = true;
+                    if (selectedMonth.isNotEmpty) {
+                      matchMonth =
+                          (data['harvestMonth'] ?? "") == selectedMonth;
+                    }
+
+                    /// SCAN
+                    bool matchScan = true;
+                    if (selectedScan.isNotEmpty && selectedScan != "All") {
+                      final isScanned = data['isScanned'] ?? false;
+
+                      matchScan = selectedScan == "Scanned"
+                          ? isScanned == true
+                          : isScanned == false;
+                    }
+
+                    return matchSearch &&
+                        matchFilter &&
+                        matchAge &&
+                        matchMonth &&
+                        matchScan;
+                  }).toList();
+
+                  // If navigated here with ?treeId=..., auto-open that tree once found.
+                  if (_routeTreeId.isNotEmpty && !_autoOpenedFromRoute) {
+                    final wanted = _routeTreeId.toLowerCase();
+                    Map<String, dynamic>? matchDoc;
+                    for (final d in trees) {
+                      final data = d;
+                      final id =
+                          (data['treeId'] ?? "").toString().toLowerCase();
+                      if (id == wanted) {
+                        matchDoc = d;
+                        break;
+                      }
+                    }
+                    if (matchDoc != null) {
+                      _autoOpenedFromRoute = true;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
                         context.pushNamed(
                           'treeDetails',
-                          extra: treeDocIdOf(docs[i]),
-                          queryParameters: const {'source': 'myTrees'},
+                          extra: treeDocIdOf(matchDoc!),
+                          queryParameters: const {'source': 'rfid'},
                         );
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.park, color: _healthColor(health)),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
+                      });
+                    }
+                  }
+
+                  if (docs.isEmpty) {
+                    return const Center(child: Text("No Trees Found"));
+                  }
+
+                  return ListView.builder(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: horizontalPadding),
+                    itemCount: docs.length,
+                    itemBuilder: (_, i) {
+                      final data = docs[i];
+
+                      final id = data['treeId'] ?? '';
+                      final loc = data['location'] ?? '';
+                      final species = data['species'] ?? '';
+                      final health = _statusLabel(data['healthStatus']);
+                      final date = _formatDate(data['lastinspectiondate']);
+
+                      return GestureDetector(
+                        onTap: () {
+                          context.pushNamed(
+                            'treeDetails',
+                            extra: treeDocIdOf(docs[i]),
+                            queryParameters: const {'source': 'myTrees'},
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final compact = constraints.maxWidth < 360;
+                              final details = Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(id,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold)),
+                                  Text(
+                                    id,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                   Text("ID: $id | $species"),
                                   Text("Plot: $loc"),
                                   Text("Last Inspection: $date"),
                                 ],
-                              ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  health,
-                                  style: TextStyle(color: _healthColor(health)),
-                                ),
-                                const SizedBox(height: 6),
-                                Consumer(
-                                  builder: (context, ref, _) {
-                                    final syncAsync = ref.watch(
-                                      treeSyncStatusProvider(
-                                        treeDocIdOf(docs[i]),
-                                      ),
-                                    );
-                                    final isSynced = syncAsync.value ?? true;
+                              );
 
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: isSynced
-                                            ? Colors.green
-                                                .withValues(alpha: 0.12)
-                                            : Colors.orange
-                                                .withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        isSynced ? 'Synced' : 'Local only',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: isSynced
-                                              ? Colors.green.shade800
-                                              : Colors.orange.shade800,
+                              final statusColumn = Column(
+                                crossAxisAlignment: compact
+                                    ? CrossAxisAlignment.start
+                                    : CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    health,
+                                    style: TextStyle(
+                                      color: _healthColor(health),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Consumer(
+                                    builder: (context, ref, _) {
+                                      final syncAsync = ref.watch(
+                                        treeSyncStatusProvider(
+                                          treeDocIdOf(docs[i]),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
+                                      );
+                                      final isSynced = syncAsync.value ?? true;
+
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isSynced
+                                              ? Colors.green.withValues(
+                                                  alpha: 0.12,
+                                                )
+                                              : Colors.orange.withValues(
+                                                  alpha: 0.12,
+                                                ),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          isSynced ? 'Synced' : 'Local only',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: isSynced
+                                                ? Colors.green.shade800
+                                                : Colors.orange.shade800,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              );
+
+                              if (compact) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          Icons.park,
+                                          color: _healthColor(health),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(child: details),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    statusColumn,
+                                  ],
+                                );
+                              }
+
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.park, color: _healthColor(health)),
+                                  const SizedBox(width: 10),
+                                  Expanded(child: details),
+                                  const SizedBox(width: 12),
+                                  statusColumn,
+                                ],
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const Center(child: Text("Error")),
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, __) => const Center(child: Text("Error")),
+              ),
             ),
-          )
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -477,19 +535,28 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      height: MediaQuery.of(context).size.height * 0.75,
+    return ResponsiveSheetBody(
+      maxWidth: 560,
+      maxHeightFactor: 0.82,
+      padding: ResponsiveLayout.pageInsets(
+        context,
+        top: 16,
+        bottom: 24,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Text("Filters",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text(
+            "Filters",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 20),
           const Text("Tree Age", style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           Wrap(
             spacing: 10,
+            runSpacing: 10,
             children: ageOptions.map((e) {
               return ChoiceChip(
                 label: Text(e),
@@ -499,8 +566,10 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
             }).toList(),
           ),
           const SizedBox(height: 20),
-          const Text("Harvest Month",
-              style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text(
+            "Harvest Month",
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
             initialValue: month.isEmpty ? null : month,
@@ -509,14 +578,17 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
             items: months
                 .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                 .toList(),
-            onChanged: (val) => setState(() => month = val!),
+            onChanged: (val) => setState(() => month = val ?? ''),
           ),
           const SizedBox(height: 20),
-          const Text("Scan Status",
-              style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text(
+            "Scan Status",
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 10,
+            runSpacing: 10,
             children: scanOptions.map((s) {
               return ChoiceChip(
                 label: Text(s),
@@ -525,36 +597,50 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
               );
             }).toList(),
           ),
-          const Spacer(),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      age = '';
-                      month = '';
-                      scan = '';
-                    });
-                  },
-                  child: const Text("Reset"),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context, {
-                      "age": age,
-                      "month": month,
-                      "scan": scan,
-                    });
-                  },
-                  child: const Text("Apply"),
-                ),
-              ),
-            ],
-          )
+          const SizedBox(height: 24),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stackActions = constraints.maxWidth < 320;
+              final resetButton = OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    age = '';
+                    month = '';
+                    scan = '';
+                  });
+                },
+                child: const Text("Reset"),
+              );
+              final applyButton = ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context, {
+                    "age": age,
+                    "month": month,
+                    "scan": scan,
+                  });
+                },
+                child: const Text("Apply"),
+              );
+
+              if (stackActions) {
+                return Column(
+                  children: [
+                    SizedBox(width: double.infinity, child: resetButton),
+                    const SizedBox(height: 10),
+                    SizedBox(width: double.infinity, child: applyButton),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: resetButton),
+                  const SizedBox(width: 10),
+                  Expanded(child: applyButton),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );

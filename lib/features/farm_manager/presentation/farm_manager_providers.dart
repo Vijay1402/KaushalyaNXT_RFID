@@ -43,7 +43,18 @@ final farmManagerScopeProvider =
 
 final farmManagerOverviewProvider =
     StreamProvider.autoDispose<FarmManagerOverviewData>((ref) async* {
+  final auth = ref.watch(firebaseAuthProvider);
   final scope = await ref.watch(farmManagerScopeProvider.future);
+  final currentUser = auth.currentUser;
+  final cachedTrees = currentUser == null
+      ? const <Map<String, dynamic>>[]
+      : await LocalCacheService().getTrees(currentUser.uid);
+
+  yield _overviewFromTreeMaps(
+    scope: scope,
+    trees: cachedTrees,
+  );
+
   yield* _watchFarmOverview(
     firestore: ref.watch(firestoreProvider),
     scope: scope,
@@ -93,6 +104,11 @@ Stream<FarmManagerOverviewData> _watchFarmOverview({
   required FirebaseFirestore firestore,
   required FarmManagerScope scope,
 }) async* {
+  yield _overviewFromTreeMaps(
+    scope: scope,
+    trees: const <Map<String, dynamic>>[],
+  );
+
   yield* Stream<FarmManagerOverviewData>.multi((controller) {
     QuerySnapshot<Map<String, dynamic>>? latestFarmSnapshot;
     QuerySnapshot<Map<String, dynamic>>? latestTreeSnapshot;
@@ -100,14 +116,10 @@ Stream<FarmManagerOverviewData> _watchFarmOverview({
     var usingDerivedIssues = false;
 
     void emitOverview() {
-      final treeSnapshot = latestTreeSnapshot;
-      if (treeSnapshot == null) {
-        return;
-      }
-
       final farmDocs = latestFarmSnapshot?.docs ??
           const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-      final treeDocs = treeSnapshot.docs;
+      final treeDocs = latestTreeSnapshot?.docs ??
+          const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
       final scopedTrees = buildScopedTrees(treeDocs, scope);
       final farms = buildFarmSummaries(
         farmDocs: farmDocs,
@@ -151,7 +163,10 @@ Stream<FarmManagerOverviewData> _watchFarmOverview({
         latestTreeSnapshot = snapshot;
         emitOverview();
       },
-      onError: controller.addError,
+      onError: (Object _, StackTrace __) {
+        latestTreeSnapshot = null;
+        emitOverview();
+      },
     );
 
     final issueSubscription =
@@ -174,4 +189,23 @@ Stream<FarmManagerOverviewData> _watchFarmOverview({
       await issueSubscription.cancel();
     };
   });
+}
+
+FarmManagerOverviewData _overviewFromTreeMaps({
+  required FarmManagerScope scope,
+  required List<Map<String, dynamic>> trees,
+}) {
+  final scopedTrees = scope.shouldFilter
+      ? trees.where((tree) => treeMatchesScope(tree, scope)).toList()
+      : trees;
+
+  return FarmManagerOverviewData(
+    scope: scope,
+    farmDocs: const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+    treeDocs: const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+    scopedTrees: scopedTrees,
+    farms: buildDerivedFarmSummaries(scopedTrees),
+    issues: buildDerivedIssuesFromTrees(scopedTrees),
+    usingDerivedIssues: true,
+  );
 }

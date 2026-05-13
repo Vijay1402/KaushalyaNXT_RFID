@@ -3,6 +3,7 @@
 // ============================================================
 import 'package:flutter/material.dart';
 import '../../../data/models/tree_model.dart';
+import '../../../shared/widgets/responsive_layout.dart';
 
 class TreePredictionsScreen extends StatelessWidget {
   final Tree tree;
@@ -15,6 +16,7 @@ class TreePredictionsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final yieldKg = tree.maintenanceRecords.length * 48 + 50;
     final nextYieldKg = (yieldKg * 1.08).round();
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
     final healthScore = tree.currentStatus == TreeHealthStatus.healthy
         ? 92
         : tree.currentStatus == TreeHealthStatus.needsAttention
@@ -31,7 +33,7 @@ class TreePredictionsScreen extends StatelessWidget {
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(horizontalPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -46,27 +48,49 @@ class TreePredictionsScreen extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Row(children: [
-                const Icon(Icons.insights, color: Colors.white, size: 32),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 280;
+                  final copy = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('AI-Powered Predictions',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15)),
+                      const Text(
+                        'AI-Powered Predictions',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Text(
-                          'Based on ${tree.ageInYears} years of data for ${tree.name}',
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 12)),
+                        'Based on ${tree.ageInYears} years of data for ${tree.name}',
+                        style:
+                            const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
                     ],
-                  ),
-                ),
-              ]),
+                  );
+
+                  if (!isCompact) {
+                    return Row(
+                      children: [
+                        const Icon(Icons.insights, color: Colors.white, size: 32),
+                        const SizedBox(width: 12),
+                        Expanded(child: copy),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.insights, color: Colors.white, size: 32),
+                      const SizedBox(height: 12),
+                      copy,
+                    ],
+                  );
+                },
+              ),
             ),
 
             const SizedBox(height: 16),
@@ -74,15 +98,28 @@ class TreePredictionsScreen extends StatelessWidget {
             // ── Yield prediction ─────────────────────────────────
             _sectionTitle('Yield Forecast'),
             const SizedBox(height: 10),
-            Row(children: [
-              Expanded(
-                  child: _predictionBox('This Season', '$yieldKg kg',
-                      Icons.agriculture, Colors.green, 'Current estimate')),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: _predictionBox('Next Season', '$nextYieldKg kg',
-                      Icons.trending_up, Colors.blue, '+8% projected')),
-            ]),
+            ResponsiveWrapGrid(
+              minChildWidth: 160,
+              maxColumns: 2,
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _predictionBox(
+                  'This Season',
+                  '$yieldKg kg',
+                  Icons.agriculture,
+                  Colors.green,
+                  'Current estimate',
+                ),
+                _predictionBox(
+                  'Next Season',
+                  '$nextYieldKg kg',
+                  Icons.trending_up,
+                  Colors.blue,
+                  '+8% projected',
+                ),
+              ],
+            ),
 
             const SizedBox(height: 16),
 
@@ -103,22 +140,53 @@ class TreePredictionsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Current Health Score',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 13)),
-                      Text('$healthScore / 100',
-                          style: TextStyle(
-                              color: healthScore > 70
-                                  ? Colors.green
-                                  : healthScore > 40
-                                      ? Colors.orange
-                                      : Colors.red,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16)),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isCompact = constraints.maxWidth < 260;
+                      final scoreText = Text(
+                        '$healthScore / 100',
+                        style: TextStyle(
+                          color: healthScore > 70
+                              ? Colors.green
+                              : healthScore > 40
+                                  ? Colors.orange
+                                  : Colors.red,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      );
+
+                      if (!isCompact) {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Current Health Score',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            scoreText,
+                          ],
+                        );
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Current Health Score',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          scoreText,
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 10),
                   ClipRRect(
@@ -261,70 +329,198 @@ class TreePredictionsScreen extends StatelessWidget {
 
   Widget _recommendationTile(
       String title, String due, String priority, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)
-        ],
-      ),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: Icon(Icons.eco, color: color, size: 18),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-            child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            Text(due,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
-          ],
-        )),
-        Container(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 280;
+        final priorityChip = Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10)),
-          child: Text(priority,
-              style: TextStyle(
-                  color: color, fontSize: 10, fontWeight: FontWeight.w700)),
-        ),
-      ]),
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            priority,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 6,
+              ),
+            ],
+          ),
+          child: isCompact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.eco, color: color, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              Text(
+                                due,
+                                style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    priorityChip,
+                  ],
+                )
+              : Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.eco, color: color, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            due,
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    priorityChip,
+                  ],
+                ),
+        );
+      },
     );
   }
 
   Widget _riskRow(String label, double value, Color color) {
-    return Row(children: [
-      SizedBox(
-          width: 130,
-          child: Text(label,
-              style:
-                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))),
-      Expanded(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: LinearProgressIndicator(
-            value: value,
-            minHeight: 8,
-            backgroundColor: Colors.grey.shade200,
-            color: color,
-          ),
-        ),
-      ),
-      const SizedBox(width: 10),
-      Text('${(value * 100).round()}%',
-          style: TextStyle(
-              fontSize: 12, color: color, fontWeight: FontWeight.w700)),
-    ]);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 280;
+
+        if (!isCompact) {
+          return Row(
+            children: [
+              SizedBox(
+                width: 130,
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: value,
+                    minHeight: 8,
+                    backgroundColor: Colors.grey.shade200,
+                    color: color,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '${(value * 100).round()}%',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: value,
+                      minHeight: 8,
+                      backgroundColor: Colors.grey.shade200,
+                      color: color,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '${(value * 100).round()}%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../../shared/widgets/responsive_layout.dart';
 import '../../models/compare_model.dart';
 
 class ComparisonTable extends StatelessWidget {
@@ -14,10 +15,13 @@ class ComparisonTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = ResponsiveLayout.isCompact(context, breakpoint: 420);
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-        columnSpacing: 20,
+        columnSpacing: compact ? 12 : 20,
+        dataRowMinHeight: compact ? 56 : 48,
         columns: [
           const DataColumn(label: Text('Tree')),
           if (filters.contains('Yield')) const DataColumn(label: Text('Yield')),
@@ -28,11 +32,17 @@ class ComparisonTable extends StatelessWidget {
         rows: trees.map((tree) {
           return DataRow(
             cells: [
-              DataCell(Text(tree.name)),
+              DataCell(
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 110),
+                  child: Text(tree.name),
+                ),
+              ),
               if (filters.contains('Yield')) DataCell(Text(tree.yield)),
               if (filters.contains('Health'))
                 DataCell(
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         tree.health == 'Healthy'

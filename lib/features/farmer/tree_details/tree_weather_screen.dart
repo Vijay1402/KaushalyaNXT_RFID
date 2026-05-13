@@ -99,11 +99,11 @@ class TreeWeatherScreen extends StatelessWidget {
                           const TextStyle(color: Colors.white70, fontSize: 13)),
                   const SizedBox(height: 8),
                   const Row(
-                    children: const [
-                      const Icon(Icons.wb_sunny,
+                    children: [
+                      Icon(Icons.wb_sunny,
                           color: Colors.yellowAccent, size: 48),
-                      const SizedBox(width: 16),
-                      const Column(
+                      SizedBox(width: 16),
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('32°C',

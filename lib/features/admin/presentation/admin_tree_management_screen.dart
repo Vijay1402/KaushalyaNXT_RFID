@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../shared/widgets/responsive_layout.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
 import '../../farm_manager/presentation/farm_manager_providers.dart';
 import 'admin_management_forms.dart';
@@ -332,7 +333,7 @@ class _AdminTreeManagementScreenState
         return AlertDialog(
           title: Text(title),
           content: SizedBox(
-            width: 420,
+            width: ResponsiveLayout.dialogWidth(context),
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: sortedFarms.length,
@@ -375,7 +376,7 @@ class _AdminTreeManagementScreenState
         return AlertDialog(
           title: const Text('Bulk Import Trees'),
           content: SizedBox(
-            width: 460,
+            width: ResponsiveLayout.dialogWidth(context, maxWidth: 460),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,6 +565,7 @@ class _AdminTreeManagementScreenState
   @override
   Widget build(BuildContext context) {
     final overviewAsync = ref.watch(globalFarmOverviewProvider);
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4FAEA),
@@ -608,7 +610,12 @@ class _AdminTreeManagementScreenState
             final pendingTags = totalTrees - taggedTrees;
 
             return SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                10,
+                horizontalPadding,
+                28,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -719,51 +726,44 @@ class _AdminTreeManagementScreenState
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Row(
+                  ResponsiveWrapGrid(
+                    minChildWidth: 150,
+                    maxColumns: 3,
+                    spacing: 14,
                     children: [
-                      Expanded(
-                        child: _TreeStatCard(
-                          backgroundColor: const Color(0xFF232322),
-                          title: 'Total Trees',
-                          value: '$totalTrees',
-                        ),
+                      _TreeStatCard(
+                        backgroundColor: const Color(0xFF232322),
+                        title: 'Total Trees',
+                        value: '$totalTrees',
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: _TreeStatCard(
-                          backgroundColor: const Color(0xFF4CAF50),
-                          title: 'RFID Tagged',
-                          value: '$taggedTrees',
-                        ),
+                      _TreeStatCard(
+                        backgroundColor: const Color(0xFF4CAF50),
+                        title: 'RFID Tagged',
+                        value: '$taggedTrees',
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: _TreeStatCard(
-                          backgroundColor: const Color(0xFFFF9800),
-                          title: 'Pending Tags',
-                          value: '$pendingTags',
-                        ),
+                      _TreeStatCard(
+                        backgroundColor: const Color(0xFFFF9800),
+                        title: 'Pending Tags',
+                        value: '$pendingTags',
                       ),
                     ],
                   ),
                   const SizedBox(height: 18),
-                  Row(
+                  ResponsiveWrapGrid(
+                    minChildWidth: 170,
+                    maxColumns: 2,
+                    spacing: 18,
                     children: [
-                      Expanded(
-                        child: _ActionCapsuleButton(
-                          label:
-                              _isBulkImporting ? 'Importing...' : 'Bulk Import',
-                          onTap: (_isBulkImporting || _isAddingTree)
-                              ? null
-                              : () => _bulkImportTrees(overview),
-                        ),
+                      _ActionCapsuleButton(
+                        label:
+                            _isBulkImporting ? 'Importing...' : 'Bulk Import',
+                        onTap: (_isBulkImporting || _isAddingTree)
+                            ? null
+                            : () => _bulkImportTrees(overview),
                       ),
-                      const SizedBox(width: 18),
-                      Expanded(
-                        child: _ActionCapsuleButton(
-                          label: _isExporting ? 'Exporting...' : 'Export Data',
-                          onTap: _isExporting ? null : _exportVisibleTrees,
-                        ),
+                      _ActionCapsuleButton(
+                        label: _isExporting ? 'Exporting...' : 'Export Data',
+                        onTap: _isExporting ? null : _exportVisibleTrees,
                       ),
                     ],
                   ),

@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_paths.dart';
+import '../../../../core/localization/app_language.dart';
 import '../../../../core/services/local_cache_service.dart';
 import '../../../../core/providers/firebase_providers.dart';
+import '../../../../shared/widgets/responsive_layout.dart';
 import '../farm_manager_data.dart';
 import '../farm_manager_providers.dart';
 
@@ -53,13 +55,14 @@ class _FarmListScreenState extends ConsumerState<FarmListScreen> {
   @override
   Widget build(BuildContext context) {
     final overviewAsync = ref.watch(farmManagerOverviewProvider);
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F2),
       appBar: AppBar(
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
-        title: const Text('Farm Directory'),
+        title: Text(context.tr('Farm Directory')),
       ),
       body: overviewAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -91,7 +94,12 @@ class _FarmListScreenState extends ConsumerState<FarmListScreen> {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  16,
+                  horizontalPadding,
+                  0,
+                ),
                 child: Column(
                   children: [
                     _SearchField(
@@ -128,52 +136,41 @@ class _FarmListScreenState extends ConsumerState<FarmListScreen> {
                         ),
                       ),
                     if (!scope.hasLinkedFarmers) const SizedBox(height: 12),
-                    Row(
+                    ResponsiveWrapGrid(
+                      minChildWidth: 150,
+                      maxColumns: 2,
+                      spacing: 10,
+                      runSpacing: 10,
                       children: [
-                        Expanded(
-                          child: _SummaryCard(
-                            icon: Icons.agriculture_outlined,
-                            title: 'Total Farms',
-                            value: '${farms.length}',
-                          ),
+                        _SummaryCard(
+                          icon: Icons.agriculture_outlined,
+                          title: 'Total Farms',
+                          value: '${farms.length}',
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _SummaryCard(
-                            icon: Icons.eco_outlined,
-                            title: 'Avg Health',
-                            value: '$averageHealth%',
-                          ),
+                        _SummaryCard(
+                          icon: Icons.eco_outlined,
+                          title: 'Avg Health',
+                          value: '$averageHealth%',
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _SummaryCard(
-                            icon: Icons.park_outlined,
-                            title: 'Total Trees',
-                            value: '${scopedTrees.length}',
-                            onTap: () {
-                              context.push(
-                                RoutePaths.farmManagerTrees,
-                              );
-                            },
-                          ),
+                        _SummaryCard(
+                          icon: Icons.park_outlined,
+                          title: 'Total Trees',
+                          value: '${scopedTrees.length}',
+                          onTap: () {
+                            context.push(
+                              RoutePaths.farmManagerTrees,
+                            );
+                          },
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _SummaryCard(
-                            icon: Icons.groups_2_outlined,
-                            title: 'Farmers',
-                            value: '${uniqueFarmerCount(scopedTrees)}',
-                            onTap: () {
-                              context.push(
-                                RoutePaths.farmManagerFarmers,
-                              );
-                            },
-                          ),
+                        _SummaryCard(
+                          icon: Icons.groups_2_outlined,
+                          title: 'Farmers',
+                          value: '${uniqueFarmerCount(scopedTrees)}',
+                          onTap: () {
+                            context.push(
+                              RoutePaths.farmManagerFarmers,
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -297,24 +294,58 @@ class _SyncPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        isOnline ? Icons.cloud_done_outlined : Icons.cloud_off,
-                        color: isOnline ? Colors.green.shade700 : Colors.red,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          isOnline ? 'Sync connected' : 'Offline mode active',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: onRefresh,
-                        child: const Text('Refresh'),
-                      ),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isCompact = constraints.maxWidth < 320;
+                      final title = Row(
+                        children: [
+                          Icon(
+                            isOnline
+                                ? Icons.cloud_done_outlined
+                                : Icons.cloud_off,
+                            color:
+                                isOnline ? Colors.green.shade700 : Colors.red,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              isOnline
+                                  ? 'Sync connected'
+                                  : 'Offline mode active',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      );
+
+                      if (!isCompact) {
+                        return Row(
+                          children: [
+                            Expanded(child: title),
+                            TextButton(
+                              onPressed: onRefresh,
+                              child: const Text('Refresh'),
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          title,
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: onRefresh,
+                              child: const Text('Refresh'),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -526,29 +557,26 @@ class _FarmCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Row(
+            ResponsiveWrapGrid(
+              minChildWidth: 132,
+              maxColumns: 3,
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: _BottomMetric(
-                    label: 'Farmer',
-                    value: farm.farmerName,
-                    highlight: true,
-                    onTap: () => _openFarmerManagement(context),
-                  ),
+                _BottomMetric(
+                  label: 'Farmer',
+                  value: farm.farmerName,
+                  highlight: true,
+                  onTap: () => _openFarmerManagement(context),
                 ),
-                Expanded(
-                  child: _BottomMetric(
-                    label: 'Scanned',
-                    value: '${farm.scannedTrees}/${farm.totalTrees}',
-                  ),
+                _BottomMetric(
+                  label: 'Scanned',
+                  value: '${farm.scannedTrees}/${farm.totalTrees}',
                 ),
-                Expanded(
-                  child: _BottomMetric(
-                    label: 'Area',
-                    value: farm.areaAcres <= 0
-                        ? 'Not set'
-                        : '${farm.areaAcres} ac',
-                  ),
+                _BottomMetric(
+                  label: 'Area',
+                  value:
+                      farm.areaAcres <= 0 ? 'Not set' : '${farm.areaAcres} ac',
                 ),
               ],
             ),

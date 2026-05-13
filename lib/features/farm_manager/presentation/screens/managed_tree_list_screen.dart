@@ -11,6 +11,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:csv/csv.dart';
 
+import '../../../../shared/widgets/responsive_layout.dart';
 import '../compare/models/compare_model.dart' as compare;
 import '../compare/presentation/select_trees_screen.dart';
 import '../farm_manager_data.dart';
@@ -348,6 +349,7 @@ class _ManagedTreeListScreenState extends ConsumerState<ManagedTreeListScreen> {
   @override
   Widget build(BuildContext context) {
     final overviewAsync = ref.watch(farmManagerOverviewProvider);
+    final horizontalPadding = ResponsiveLayout.pagePadding(context);
 
     return overviewAsync.when(
       loading: () => const Scaffold(
@@ -366,36 +368,40 @@ class _ManagedTreeListScreenState extends ConsumerState<ManagedTreeListScreen> {
             foregroundColor: Colors.white,
             title: const Text('All Trees View'),
           ),
-          body: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (value) {
-                    setState(() {
-                      _search = value.trim().toLowerCase();
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Search',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: const Icon(Icons.mic),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide.none,
+          body: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.all(horizontalPadding),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) {
+                      setState(() {
+                        _search = value.trim().toLowerCase();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Search',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: const Icon(Icons.mic),
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: ResponsiveWrapGrid(
+                    minChildWidth: 160,
+                    maxColumns: 2,
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      OutlinedButton(
                         onPressed: () {
                           _showMessage('Advanced filters can be added next.');
                         },
@@ -406,10 +412,7 @@ class _ManagedTreeListScreenState extends ConsumerState<ManagedTreeListScreen> {
                         ),
                         child: const Text('Advanced Filters'),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
+                      ElevatedButton.icon(
                         onPressed: _openCompareFlow,
                         icon: const Icon(Icons.compare_arrows),
                         label: Text(
@@ -422,129 +425,173 @@ class _ManagedTreeListScreenState extends ConsumerState<ManagedTreeListScreen> {
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _selectedTrees.isEmpty
-                            ? 'Tap Compare to choose trees, or long-press a tree to preselect it here.'
-                            : 'Long-press or tap selected cards to adjust your compare list.',
-                        style: TextStyle(
-                          color: Colors.grey.shade700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    if (_selectedTrees.isNotEmpty)
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _selectedTrees.clear();
-                          });
-                        },
-                        child: const Text('Clear'),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: Builder(
-                  builder: (context) {
-                    _currentScopedTrees = scopedTrees;
-                    final visibleTrees = scopedTrees.where((tree) {
-                      if (_search.isEmpty) {
-                        return true;
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding + 4,
+                    8,
+                    horizontalPadding + 4,
+                    0,
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isCompact = constraints.maxWidth < 320;
+                      if (!isCompact) {
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _selectedTrees.isEmpty
+                                    ? 'Tap Compare to choose trees, or long-press a tree to preselect it here.'
+                                    : 'Long-press or tap selected cards to adjust your compare list.',
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            if (_selectedTrees.isNotEmpty)
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedTrees.clear();
+                                  });
+                                },
+                                child: const Text('Clear'),
+                              ),
+                          ],
+                        );
                       }
 
-                      final values = <String>[
-                        _treeLabel(tree),
-                        firstNonEmptyString([tree['location']]),
-                        firstNonEmptyString([tree['species']]),
-                        farmNameFromTree(tree),
-                        farmerNameFromTree(tree),
-                      ];
-
-                      return values.any(
-                        (value) => value.toLowerCase().contains(_search),
-                      );
-                    }).toList(growable: false);
-                    _currentVisibleTrees = visibleTrees;
-
-                    if (visibleTrees.isEmpty) {
-                      final message = scopedTrees.isEmpty
-                          ? 'No trees found'
-                          : 'No trees match the current search';
-                      return Center(child: Text(message));
-                    }
-
-                    return ListView.builder(
-                      itemCount: visibleTrees.length,
-                      itemBuilder: (context, index) {
-                        final tree = visibleTrees[index];
-                        final key = _treeKey(tree);
-                        final health = healthLabel(tree['healthStatus']);
-                        final isHealthy = health == 'Healthy';
-
-                        return GestureDetector(
-                          onTap: () {
-                            if (_selectedTrees.isNotEmpty) {
-                              _toggleSelected(tree);
-                              return;
-                            }
-                            _openTreeDetails(tree);
-                          },
-                          onLongPress: () => _toggleSelected(tree),
-                          child: TreeCard(
-                            id: _treeLabel(tree),
-                            age: firstNonEmptyString(
-                              [
-                                tree['treeAge'],
-                                tree['age'],
-                              ],
-                              fallback: 'Unknown',
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _selectedTrees.isEmpty
+                                ? 'Tap Compare to choose trees, or long-press a tree to preselect it here.'
+                                : 'Long-press or tap selected cards to adjust your compare list.',
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontSize: 12,
                             ),
-                            address: firstNonEmptyString(
-                              [
-                                tree['location'],
-                                tree['plotNumber'],
-                                tree['plot'],
-                              ],
-                              fallback: 'Farm Address',
-                            ),
-                            yieldValue: firstNonEmptyString(
-                              [
-                                tree['lastYieldKg'],
-                                tree['yieldKg'],
-                                tree['yield'],
-                              ],
-                              fallback: 'Unknown',
-                            ),
-                            status: tree['isScanned'] == true
-                                ? 'Scanned'
-                                : 'Not Scanned',
-                            health: health,
-                            isHealthy: isHealthy,
-                            isSelected: _selectedTrees.contains(key),
                           ),
-                        );
-                      },
-                    );
-                  },
+                          if (_selectedTrees.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedTrees.clear();
+                                  });
+                                },
+                                child: const Text('Clear'),
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
+                const SizedBox(height: 10),
+                Expanded(
+                  child: Builder(
+                    builder: (context) {
+                      _currentScopedTrees = scopedTrees;
+                      final visibleTrees = scopedTrees.where((tree) {
+                        if (_search.isEmpty) {
+                          return true;
+                        }
+
+                        final values = <String>[
+                          _treeLabel(tree),
+                          firstNonEmptyString([tree['location']]),
+                          firstNonEmptyString([tree['species']]),
+                          farmNameFromTree(tree),
+                          farmerNameFromTree(tree),
+                        ];
+
+                        return values.any(
+                          (value) => value.toLowerCase().contains(_search),
+                        );
+                      }).toList(growable: false);
+                      _currentVisibleTrees = visibleTrees;
+
+                      if (visibleTrees.isEmpty) {
+                        final message = scopedTrees.isEmpty
+                            ? 'No trees found'
+                            : 'No trees match the current search';
+                        return Center(child: Text(message));
+                      }
+
+                      return ListView.builder(
+                        padding: EdgeInsets.only(bottom: horizontalPadding),
+                        itemCount: visibleTrees.length,
+                        itemBuilder: (context, index) {
+                          final tree = visibleTrees[index];
+                          final key = _treeKey(tree);
+                          final health = healthLabel(tree['healthStatus']);
+                          final isHealthy = health == 'Healthy';
+
+                          return GestureDetector(
+                            onTap: () {
+                              if (_selectedTrees.isNotEmpty) {
+                                _toggleSelected(tree);
+                                return;
+                              }
+                              _openTreeDetails(tree);
+                            },
+                            onLongPress: () => _toggleSelected(tree),
+                            child: TreeCard(
+                              id: _treeLabel(tree),
+                              age: firstNonEmptyString(
+                                [
+                                  tree['treeAge'],
+                                  tree['age'],
+                                ],
+                                fallback: 'Unknown',
+                              ),
+                              address: firstNonEmptyString(
+                                [
+                                  tree['location'],
+                                  tree['plotNumber'],
+                                  tree['plot'],
+                                ],
+                                fallback: 'Farm Address',
+                              ),
+                              yieldValue: firstNonEmptyString(
+                                [
+                                  tree['lastYieldKg'],
+                                  tree['yieldKg'],
+                                  tree['yield'],
+                                ],
+                                fallback: 'Unknown',
+                              ),
+                              status: tree['isScanned'] == true
+                                  ? 'Scanned'
+                                  : 'Not Scanned',
+                              health: health,
+                              isHealthy: isHealthy,
+                              isSelected: _selectedTrees.contains(key),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.all(horizontalPadding),
+                  child: ResponsiveWrapGrid(
+                    minChildWidth: 160,
+                    maxColumns: 2,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ElevatedButton(
                         onPressed:
                             _exportingPdf ? null : _exportVisibleTreesPdf,
                         style: ElevatedButton.styleFrom(
@@ -557,10 +604,7 @@ class _ManagedTreeListScreenState extends ConsumerState<ManagedTreeListScreen> {
                           _exportingPdf ? 'Exporting...' : 'Export PDF',
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton(
+                      ElevatedButton(
                         onPressed:
                             _exportingExcel ? null : _exportVisibleTreesExcel,
                         style: ElevatedButton.styleFrom(
@@ -573,11 +617,11 @@ class _ManagedTreeListScreenState extends ConsumerState<ManagedTreeListScreen> {
                           _exportingExcel ? 'Exporting...' : 'Export Excel',
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -609,6 +653,8 @@ class TreeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context, breakpoint: 380);
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       elevation: 2,
@@ -616,48 +662,99 @@ class TreeCard extends StatelessWidget {
       color: isSelected ? Colors.blue[50] : Colors.purple[50],
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            const Icon(Icons.park, size: 50, color: Colors.green),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
+        child: isCompact
+            ? Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Tree #$id',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.park, size: 50, color: Colors.green),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tree #$id',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text('Tree Age: $age'),
+                            const SizedBox(height: 2),
+                            Text(address),
+                            const SizedBox(height: 2),
+                            Text('Yield: $yieldValue'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (isSelected)
+                        const Icon(Icons.check_circle, color: Colors.blue),
+                      StatusBadge(
+                        text: status,
+                        color: isHealthy ? Colors.green : Colors.orange,
+                      ),
+                      StatusBadge(
+                        text: health,
+                        color: isHealthy ? Colors.green : Colors.orange,
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  const Icon(Icons.park, size: 50, color: Colors.green),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tree #$id',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text('Tree Age: $age'),
+                        const SizedBox(height: 2),
+                        Text(address),
+                        const SizedBox(height: 2),
+                        Text('Yield: $yieldValue'),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text('Tree Age: $age'),
-                  const SizedBox(height: 2),
-                  Text(address),
-                  const SizedBox(height: 2),
-                  Text('Yield: $yieldValue'),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (isSelected)
+                        const Icon(Icons.check_circle, color: Colors.blue),
+                      StatusBadge(
+                        text: status,
+                        color: isHealthy ? Colors.green : Colors.orange,
+                      ),
+                      const SizedBox(height: 8),
+                      StatusBadge(
+                        text: health,
+                        color: isHealthy ? Colors.green : Colors.orange,
+                      ),
+                    ],
+                  ),
                 ],
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (isSelected)
-                  const Icon(Icons.check_circle, color: Colors.blue),
-                StatusBadge(
-                  text: status,
-                  color: isHealthy ? Colors.green : Colors.orange,
-                ),
-                const SizedBox(height: 8),
-                StatusBadge(
-                  text: health,
-                  color: isHealthy ? Colors.green : Colors.orange,
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
