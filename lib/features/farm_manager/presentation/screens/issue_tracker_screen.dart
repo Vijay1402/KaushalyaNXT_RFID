@@ -342,7 +342,9 @@ class _IssueTrackerScreenState extends ConsumerState<IssueTrackerScreen> {
           final scope = overview.scope;
           final scopedTrees = overview.scopedTrees;
 
-          if (scope.shouldFilter && scopedTrees.isEmpty) {
+          if (scope.shouldFilter &&
+              scopedTrees.isEmpty &&
+              overview.issues.isEmpty) {
             return _buildIssueContent(
               const <FarmManagerIssue>[],
               helperMessage: scope.hasLinkedFarmers
@@ -357,9 +359,11 @@ class _IssueTrackerScreenState extends ConsumerState<IssueTrackerScreen> {
               ? overview.usingDerivedIssues
                   ? 'Issue subcollections are not readable for this role, so the tracker is showing health-based alerts from the managed trees instead.'
                   : null
-              : overview.usingDerivedIssues
-                  ? 'Issue details are restricted by Firestore rules for this account. No accessible issue records were found yet.'
-                  : 'Showing the global issue feed because no manager scope was available for this session.';
+              : overview.issues.isNotEmpty
+                  ? 'Showing reports matched to this manager from farmer support or issue submissions.'
+                  : overview.usingDerivedIssues
+                      ? 'Issue details are restricted by Firestore rules for this account. No accessible issue records were found yet.'
+                      : 'Showing the global issue feed because no manager scope was available for this session.';
 
           return _buildIssueContent(
             overview.issues,
@@ -711,11 +715,20 @@ class _IssueCard extends StatelessWidget {
                 ),
                 if (issue.note.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  Text(
-                    issue.note,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.grey.shade800),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Text(
+                      'Farmer message: ${issue.note}',
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.grey.shade800),
+                    ),
                   ),
                 ],
                 const SizedBox(height: 10),

@@ -113,6 +113,8 @@ Stream<FarmManagerOverviewData> _watchFarmOverview({
     QuerySnapshot<Map<String, dynamic>>? latestFarmSnapshot;
     QuerySnapshot<Map<String, dynamic>>? latestTreeSnapshot;
     QuerySnapshot<Map<String, dynamic>>? latestIssueSnapshot;
+    QuerySnapshot<Map<String, dynamic>>? latestTopLevelIssueSnapshot;
+    QuerySnapshot<Map<String, dynamic>>? latestUserSnapshot;
     var usingDerivedIssues = false;
 
     void emitOverview() {
@@ -126,13 +128,32 @@ Stream<FarmManagerOverviewData> _watchFarmOverview({
         scopedTrees: scopedTrees,
         scope: scope,
       );
-      final issues = latestIssueSnapshot == null
+      final allIssueDocs = [
+        ...(latestIssueSnapshot?.docs ??
+            const <QueryDocumentSnapshot<Map<String, dynamic>>>[]),
+        ...(latestTopLevelIssueSnapshot?.docs ??
+            const <QueryDocumentSnapshot<Map<String, dynamic>>>[]),
+      ];
+      final trackerIssues = allIssueDocs.isEmpty
           ? buildDerivedIssuesFromTrees(scopedTrees)
           : buildIssueSummaries(
-              issueDocs: latestIssueSnapshot!.docs,
+              issueDocs: allIssueDocs,
               scopedTrees: scopedTrees,
               scope: scope,
             );
+      final supportIssues = _buildSupportIssuesFromUsers(
+        userDocs: latestUserSnapshot?.docs ??
+            const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+        scope: scope,
+      );
+      final issues = _uniqueOverviewIssues([...trackerIssues, ...supportIssues])
+        ..sort((left, right) {
+          final rightTime =
+              right.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final leftTime =
+              left.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return rightTime.compareTo(leftTime);
+        });
 
       controller.add(
         FarmManagerOverviewData(
@@ -183,10 +204,35 @@ Stream<FarmManagerOverviewData> _watchFarmOverview({
       },
     );
 
+    final topLevelIssueSubscription =
+        firestore.collection('issues').snapshots().listen(
+      (snapshot) {
+        latestTopLevelIssueSnapshot = snapshot;
+        emitOverview();
+      },
+      onError: (Object _, StackTrace __) {
+        latestTopLevelIssueSnapshot = null;
+        emitOverview();
+      },
+    );
+
+    final userSubscription = firestore.collection('users').snapshots().listen(
+      (snapshot) {
+        latestUserSnapshot = snapshot;
+        emitOverview();
+      },
+      onError: (Object _, StackTrace __) {
+        latestUserSnapshot = null;
+        emitOverview();
+      },
+    );
+
     controller.onCancel = () async {
       await farmSubscription.cancel();
       await treeSubscription.cancel();
       await issueSubscription.cancel();
+      await topLevelIssueSubscription.cancel();
+      await userSubscription.cancel();
     };
   });
 }
@@ -208,4 +254,130 @@ FarmManagerOverviewData _overviewFromTreeMaps({
     issues: buildDerivedIssuesFromTrees(scopedTrees),
     usingDerivedIssues: true,
   );
+}
+
+List<FarmManagerIssue> _uniqueOverviewIssues(List<FarmManagerIssue> issues) {
+  final unique = <String, FarmManagerIssue>{};
+  for (final issue in issues) {
+    final key = firstNonEmptyString([
+      issue.id,
+      issue.treeDocId.isEmpty ? '' : '${issue.treeDocId}:${issue.note}',
+      '${issue.ownerName}:${issue.title}:${issue.note}',
+    ]);
+    unique[key] = issue;
+  }
+  return unique.values.toList(growable: false);
+}
+
+List<FarmManagerIssue> _buildSupportIssuesFromUsers({
+  required List<QueryDocumentSnapshot<Map<String, dynamic>>> userDocs,
+  required FarmManagerScope scope,
+}) {
+  final issues = <FarmManagerIssue>[];
+
+  for (final doc in userDocs) {
+    final userData = <String, dynamic>{
+      '_docId': doc.id,
+      ...doc.data(),
+    };
+    if (scope.shouldFilter && !_userMatchesScope(userData, scope)) {
+      continue;
+    }
+
+    final rawIssue = userData['latestSupportIssue'];
+    if (rawIssue is! Map) {
+      continue;
+    }
+    final issue = Map<String, dynamic>.from(rawIssue);
+    final note = firstNonEmptyString([
+      issue['note'],
+      userData['latestSupportIssueMessage'],
+    ]);
+    if (note.isEmpty) {
+      continue;
+    }
+
+    final status = normalizedIssueStatus(
+      issue['status'] ?? userData['latestSupportIssueStatus'] ?? 'open',
+    );
+    final farmerName = firstNonEmptyString(
+      [issue['farmerName'], issue['ownerName'], userData['name']],
+      fallback: 'Farmer',
+    );
+
+    issues.add(
+      FarmManagerIssue(
+        id: firstNonEmptyString(
+          [issue['reportId']],
+          fallback: 'support_${doc.id}',
+        ),
+        treeDocId: '',
+        treeId: 'Support',
+        farmId: 'support',
+        farmLabel: 'Support',
+        title: firstNonEmptyString([issue['title'], note]),
+        note: note,
+        status: status,
+        severity: issueSeverity(
+          status: status,
+          healthLabelValue: 'Unknown',
+        ),
+        healthLabel: 'Support',
+        ownerName: farmerName,
+        hasImage: false,
+        createdAt: parseDateTime(
+          userData['latestSupportIssueAt'] ?? issue['createdAtLocal'],
+        ),
+      ),
+    );
+  }
+
+  return issues;
+}
+
+bool _userMatchesScope(
+  Map<String, dynamic> user,
+  FarmManagerScope scope,
+) {
+  if (!scope.shouldFilter) {
+    return true;
+  }
+
+  final userId = firstNonEmptyString([
+    user['_docId'],
+    user['userId'],
+    user['uid'],
+    user['farmerId'],
+  ]);
+  if (userId.isNotEmpty && scope.linkedFarmerIds.contains(userId)) {
+    return true;
+  }
+
+  final email = firstNonEmptyString([
+    user['email'],
+    user['userEmail'],
+    user['farmerEmail'],
+  ]).toLowerCase();
+  if (email.isNotEmpty &&
+      scope.linkedFarmerEmails
+          .map((value) => value.trim().toLowerCase())
+          .contains(email)) {
+    return true;
+  }
+
+  final managerId = firstNonEmptyString([
+    user['farmManagerId'],
+    user['managerId'],
+  ]);
+  if (managerId.isNotEmpty && managerId == scope.managerUid) {
+    return true;
+  }
+
+  final managerCode = firstNonEmptyString([
+    user['farmManagerCode'],
+    user['managerCode'],
+  ]);
+  return managerCode.isNotEmpty &&
+      scope.managerCode.isNotEmpty &&
+      managerCode == scope.managerCode;
 }

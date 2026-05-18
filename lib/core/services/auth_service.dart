@@ -828,6 +828,13 @@ class AuthService {
       }
     }
 
-    await docRef.delete();
+    await docRef.set({
+      'isRemoved': true,
+      'removedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'farmManagerId': '',
+      'farmManagerName': '',
+      'farmManagerCode': '',
+    }, SetOptions(merge: true));
   }
 }

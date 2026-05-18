@@ -11,6 +11,8 @@ class RoutePaths {
   static const farmManagerFarmers = '/farm-manager/farmers';
   static const farmManagerAnalytics = '/farm-manager/analytics';
   static const adminHome = '/admin/home';
+  static const kvkHome = '/kvk/home';
+  static const agricultureOfficerHome = '/agriculture-officer/home';
   static const forgotPassword = '/forgot-password';
   static const activityLog = '/activity-log';
 
@@ -18,6 +20,15 @@ class RoutePaths {
     final normalized = (role ?? '').trim().toLowerCase();
     if (normalized == 'admin') {
       return adminHome;
+    }
+    if (normalized == 'kvk') {
+      return kvkHome;
+    }
+    if (normalized == 'agriculture_officer' ||
+        normalized == 'agriculture officer' ||
+        normalized == 'aggriculture_officer' ||
+        normalized == 'aggriculture officer') {
+      return agricultureOfficerHome;
     }
     if (normalized == 'farm_manager' || normalized == 'farm manager') {
       return farmManagerHome;

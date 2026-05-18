@@ -499,14 +499,16 @@ class _RFIDScanScreenState extends ConsumerState<RFIDScanScreen>
 
   String _speciesLabel(Species species) {
     switch (species) {
-      case Species.mango:
-        return 'Mango';
-      case Species.coconut:
-        return 'Coconut';
-      case Species.arecanut:
-        return 'Arecanut';
-      case Species.cashew:
-        return 'Cashew';
+      case Species.tubugerejack:
+        return 'Tubugerejack';
+      case Species.siddujack:
+        return 'Siddujack';
+      case Species.shankara:
+        return 'Shankara';
+      case Species.byrachandra:
+        return 'Byrachandra';
+      case Species.kanchahalliKempuSiddappa:
+        return 'Kanchahalli Kempu Siddappa';
       case Species.unknown:
         return 'Unknown';
     }

@@ -12,10 +12,11 @@ enum HealthStatus {
 
 enum Species {
   unknown,
-  mango,
-  coconut,
-  arecanut,
-  cashew,
+  tubugerejack,
+  siddujack,
+  shankara,
+  byrachandra,
+  kanchahalliKempuSiddappa,
   // add more as needed
 }
 

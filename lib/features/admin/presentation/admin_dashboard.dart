@@ -75,7 +75,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.park_rounded),
-            label: context.tr('My Farm'),
+            label: context.tr('Farms'),
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.grid_view_rounded),

@@ -1,23 +1,138 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/app_language.dart';
+import '../../../core/providers/firebase_providers.dart';
 import '../../../shared/widgets/responsive_layout.dart';
+import '../providers/auth_provider.dart';
 
-class SupportScreen extends StatefulWidget {
+class SupportScreen extends ConsumerStatefulWidget {
   const SupportScreen({super.key});
 
   @override
-  State<SupportScreen> createState() => _SupportScreenState();
+  ConsumerState<SupportScreen> createState() => _SupportScreenState();
 }
 
-class _SupportScreenState extends State<SupportScreen> {
+class _SupportScreenState extends ConsumerState<SupportScreen> {
   final TextEditingController issueController = TextEditingController();
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
     issueController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submitSupportIssue() async {
+    final text = issueController.text.trim();
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (text.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(context.tr('Please describe your issue')),
+        ),
+      );
+      return;
+    }
+
+    final user = ref.read(firebaseAuthProvider).currentUser;
+    if (user == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Please log in to submit support.')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final appUser = ref.read(authStateProvider).user;
+      final firestore = ref.read(firestoreProvider);
+      final reportRef = firestore.collection('issues').doc();
+
+      final farmerName = _firstNonEmptyString([
+        appUser?.name,
+        user.displayName,
+        user.email,
+      ]);
+      final farmerEmail = _firstNonEmptyString([
+        appUser?.email,
+        user.email,
+      ]);
+      final managerId = _firstNonEmptyString([
+        appUser?.farmManagerId,
+      ]);
+      final managerCode = _firstNonEmptyString([
+        appUser?.farmManagerCode,
+      ]);
+
+      final issueData = {
+        'reportId': reportRef.id,
+        'treeDocId': '',
+        'treeId': 'Support',
+        'species': 'Support',
+        'healthStatus': 'Support',
+        'title': text,
+        'farm': 'Support',
+        'ownerName': farmerName,
+        'farmerName': farmerName,
+        'userId': user.uid,
+        'farmerId': user.uid,
+        'userEmail': farmerEmail,
+        'farmerEmail': farmerEmail,
+        'managerId': managerId,
+        'farmManagerId': managerId,
+        'managerCode': managerCode,
+        'farmManagerCode': managerCode,
+        'farmManagerName': appUser?.farmManagerName ?? '',
+        'note': text,
+        'localImagePath': '',
+        'hasImage': false,
+        'imageUrl': '',
+        'status': 'open',
+        'source': 'support',
+        'reportedByUid': user.uid,
+        'reportedByEmail': farmerEmail,
+        'createdAtLocal': DateTime.now().toIso8601String(),
+      };
+      final topLevelIssueData = {
+        ...issueData,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      final batch = firestore.batch();
+      batch.set(reportRef, topLevelIssueData, SetOptions(merge: true));
+      batch.set(
+          firestore.collection('users').doc(user.uid),
+          {
+            'latestSupportIssue': issueData,
+            'latestSupportIssueStatus': 'open',
+            'latestSupportIssueMessage': text,
+            'latestSupportIssueAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true));
+      await batch.commit();
+
+      if (!mounted) return;
+      issueController.clear();
+      messenger.showSnackBar(
+        SnackBar(content: Text(context.tr('Submitted successfully'))),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Failed to submit support issue.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -97,30 +212,7 @@ class _SupportScreenState extends State<SupportScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        final text = issueController.text.trim();
-
-                        if (text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                context.tr('Please describe your issue'),
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              context.tr('Submitted successfully'),
-                            ),
-                          ),
-                        );
-
-                        issueController.clear();
-                      },
+                      onPressed: _isSubmitting ? null : _submitSupportIssue,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.grey.shade200,
                         foregroundColor: Colors.deepPurple,
@@ -131,7 +223,7 @@ class _SupportScreenState extends State<SupportScreen> {
                         elevation: 3,
                       ),
                       child: Text(
-                        context.tr('Submit'),
+                        _isSubmitting ? 'Submitting...' : context.tr('Submit'),
                         style: const TextStyle(fontSize: 16),
                       ),
                     ),
@@ -165,6 +257,16 @@ class _SupportScreenState extends State<SupportScreen> {
       ),
     );
   }
+}
+
+String _firstNonEmptyString(List<dynamic> values) {
+  for (final value in values) {
+    final text = (value ?? '').toString().trim();
+    if (text.isNotEmpty) {
+      return text;
+    }
+  }
+  return '';
 }
 
 class _SupportCard extends StatelessWidget {

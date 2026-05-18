@@ -6,7 +6,6 @@ import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/auth/presentation/login_screen_v2.dart';
 import '../../features/auth/presentation/register_screen_v2.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
-import '../../features/auth/presentation/local_storage_viewer_screen.dart';
 import '../../features/farmer/dashboard/farmer_dashboard.dart';
 import '../../features/farmer/dashboard/activity_log_screen.dart';
 import '../../features/farm_manager/presentation/farm_manager_dashboard.dart';
@@ -18,8 +17,10 @@ import '../../features/farm_manager/presentation/screens/analytics_screen.dart';
 import '../../features/farm_manager/presentation/screens/farmer_management_screen.dart';
 import '../../features/farm_manager/presentation/screens/managed_tree_list_screen.dart';
 import '../../features/admin/presentation/admin_dashboard.dart';
+import '../../features/agriculture_officer/presentation/agriculture_officer_dashboard_screen.dart';
 import '../../features/farmer/my_trees/my_trees_screen.dart';
 import '../../features/farmer/profile/profile_screen.dart';
+import '../../features/KVK/presentation/kvk_dashboard_screen.dart';
 import '../../features/rfid/rfid_scan_screen.dart';
 import '../../features/farmer/reports/reports_screen.dart';
 import '../../features/farmer/tree_details/tree_detail_screen.dart';
@@ -84,6 +85,18 @@ GoRouter createRouter(Ref ref) {
       if (loggedIn &&
           location == RoutePaths.adminHome &&
           homeRoute != RoutePaths.adminHome) {
+        return homeRoute;
+      }
+
+      if (loggedIn &&
+          location == RoutePaths.kvkHome &&
+          homeRoute != RoutePaths.kvkHome) {
+        return homeRoute;
+      }
+
+      if (loggedIn &&
+          location == RoutePaths.agricultureOfficerHome &&
+          homeRoute != RoutePaths.agricultureOfficerHome) {
         return homeRoute;
       }
 
@@ -173,6 +186,16 @@ GoRouter createRouter(Ref ref) {
       ),
 
       GoRoute(
+        path: RoutePaths.kvkHome,
+        builder: (context, state) => const KvkDashboardScreen(),
+      ),
+
+      GoRoute(
+        path: RoutePaths.agricultureOfficerHome,
+        builder: (context, state) => const AgricultureOfficerDashboardScreen(),
+      ),
+
+      GoRoute(
         path: RoutePaths.activityLog,
         builder: (context, state) => const ActivityLogScreen(),
       ),
@@ -193,11 +216,6 @@ GoRouter createRouter(Ref ref) {
       GoRoute(
         path: '/notification-settings',
         builder: (context, state) => const NotificationSettingsScreen(),
-      ),
-
-      GoRoute(
-        path: '/local-storage',
-        builder: (context, state) => const LocalStorageViewerScreen(),
       ),
 
       GoRoute(

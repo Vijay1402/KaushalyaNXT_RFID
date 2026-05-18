@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../shared/widgets/responsive_layout.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
 import '../../farm_manager/presentation/farm_manager_providers.dart';
+import 'admin_confirmation_dialog.dart';
 import 'admin_management_forms.dart';
 import 'admin_management_service.dart';
 import 'admin_tree_detail_screen.dart';
@@ -99,6 +100,22 @@ class _AdminTreeManagementScreenState
     if (formData == null) {
       return;
     }
+    if (!mounted) {
+      return;
+    }
+
+    final confirmed = await showAdminNameConfirmationDialog(
+      context: context,
+      title: 'Confirm New Tree',
+      entityLabel: 'tree',
+      expectedName: formData.treeId,
+      actionLabel: 'Add Tree',
+      warning:
+          'This will add a tree to ${selectedFarm.name}. Type the tree ID to continue.',
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
 
     setState(() {
       _isAddingTree = true;
@@ -155,6 +172,22 @@ class _AdminTreeManagementScreenState
     final rows = _parseBulkImportRows(rawInput);
     if (rows.isEmpty) {
       _showMessage('No valid tree rows were found to import.');
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final confirmed = await showAdminNameConfirmationDialog(
+      context: context,
+      title: 'Confirm Bulk Import',
+      entityLabel: 'farm',
+      expectedName: selectedFarm.name,
+      actionLabel: 'Import Trees',
+      warning:
+          'This will add ${rows.length} tree(s). Type the farm name to continue.',
+    );
+    if (!confirmed || !mounted) {
       return;
     }
 

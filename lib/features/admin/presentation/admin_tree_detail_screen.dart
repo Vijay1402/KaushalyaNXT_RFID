@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/firebase_providers.dart';
 import '../../../shared/widgets/responsive_layout.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
+import 'admin_confirmation_dialog.dart';
 import 'admin_management_forms.dart';
 import 'admin_management_service.dart';
 
@@ -38,6 +39,26 @@ class _AdminTreeDetailScreenState extends ConsumerState<AdminTreeDetailScreen> {
     );
 
     if (formData == null) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final currentTreeId = firstNonEmptyString(
+      [tree['treeId']],
+      fallback: widget.treeDocId,
+    );
+    final confirmed = await showAdminNameConfirmationDialog(
+      context: context,
+      title: 'Confirm Tree Update',
+      entityLabel: 'tree',
+      expectedName: currentTreeId,
+      actionLabel: 'Save Tree',
+      warning:
+          'This will change the tree record. Type the current tree ID to continue.',
+    );
+    if (!confirmed || !mounted) {
       return;
     }
 
@@ -90,33 +111,18 @@ class _AdminTreeDetailScreenState extends ConsumerState<AdminTreeDetailScreen> {
 
   Future<void> _deleteTree(Map<String, dynamic> tree) async {
     final treeId = firstNonEmptyString([tree['treeId']], fallback: 'this tree');
-    final shouldDelete = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Delete Tree'),
-            content: Text(
-              'Delete $treeId from this farm?\n\nThis also removes any issue '
-              'records linked to the tree.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final confirmed = await showAdminNameConfirmationDialog(
+      context: context,
+      title: 'Delete Tree',
+      entityLabel: 'tree',
+      expectedName: treeId,
+      actionLabel: 'Delete Tree',
+      destructive: true,
+      warning: 'This will delete $treeId and any issue records linked to it. '
+          'Type the tree ID to continue.',
+    );
 
-    if (!shouldDelete) {
+    if (!confirmed || !mounted) {
       return;
     }
 

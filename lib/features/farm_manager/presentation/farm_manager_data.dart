@@ -424,6 +424,7 @@ List<FarmManagerIssue> buildIssueSummariesFromMaps({
     final ownerName = firstNonEmptyString(
       [
         data['ownerName'],
+        data['farmerName'],
         relatedTree?['ownerName'],
         relatedTree?['farmerName'],
       ],
@@ -500,16 +501,21 @@ List<FarmManagerIssue> buildDerivedIssuesFromTrees(
     final ownerName = farmerNameFromTree(tree);
     final note = firstNonEmptyString(
       [
+        tree['latestIssueNote'],
+        tree['latestIssueMessage'],
         tree['notes'],
         tree['healthStatusName'],
       ],
       fallback: 'No message',
     );
-    const status = 'Open';
+    final status = normalizedIssueStatus(tree['latestIssueStatus'] ?? 'Open');
 
     issues.add(
       FarmManagerIssue(
-        id: treeDocId.isEmpty ? treeId : 'derived_$treeDocId',
+        id: firstNonEmptyString(
+          [tree['latestIssueId']],
+          fallback: treeDocId.isEmpty ? treeId : 'derived_$treeDocId',
+        ),
         treeDocId: treeDocId,
         treeId: treeId,
         farmId: farmIdFromTree(tree),
@@ -1343,6 +1349,8 @@ bool _issueMatchesScope({
     [
       issue['reportedByUid'],
       issue['userId'],
+      issue['farmerId'],
+      issue['ownerId'],
     ],
   );
   if (reporterId.isNotEmpty && scope.linkedFarmerIds.contains(reporterId)) {
@@ -1353,10 +1361,36 @@ bool _issueMatchesScope({
     [
       issue['reportedByEmail'],
       issue['userEmail'],
+      issue['farmerEmail'],
+      issue['ownerEmail'],
     ],
   );
-  return reporterEmail.isNotEmpty &&
-      scope.linkedFarmerEmails.contains(reporterEmail);
+  if (reporterEmail.isNotEmpty &&
+      scope.linkedFarmerEmails
+          .map((email) => email.trim().toLowerCase())
+          .contains(reporterEmail.trim().toLowerCase())) {
+    return true;
+  }
+
+  final managerId = firstNonEmptyString(
+    [
+      issue['farmManagerId'],
+      issue['managerId'],
+    ],
+  );
+  if (managerId.isNotEmpty && managerId == scope.managerUid) {
+    return true;
+  }
+
+  final managerCode = firstNonEmptyString(
+    [
+      issue['farmManagerCode'],
+      issue['managerCode'],
+    ],
+  );
+  return managerCode.isNotEmpty &&
+      scope.managerCode.isNotEmpty &&
+      managerCode == scope.managerCode;
 }
 
 bool _treeBelongsToFarmDoc(

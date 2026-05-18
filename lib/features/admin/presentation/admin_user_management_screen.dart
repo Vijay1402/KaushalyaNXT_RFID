@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/firebase_providers.dart';
 import '../../../shared/widgets/responsive_layout.dart';
 import '../../auth/providers/auth_provider.dart';
+import 'admin_confirmation_dialog.dart';
 
 class AdminUserManagementScreen extends ConsumerStatefulWidget {
   const AdminUserManagementScreen({
@@ -25,6 +26,7 @@ class _AdminUserManagementScreenState
   final TextEditingController _searchController = TextEditingController();
 
   String _search = '';
+  String _selectedRole = 'all';
   bool _isSubmitting = false;
 
   @override
@@ -43,6 +45,22 @@ class _AdminUserManagementScreenState
     if (result == null ||
         result.action != _AdminUserDialogAction.save ||
         formData == null) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final confirmed = await showAdminNameConfirmationDialog(
+      context: context,
+      title: 'Confirm New User',
+      entityLabel: 'user',
+      expectedName: formData.name,
+      actionLabel: 'Create User',
+      warning:
+          'This will create a new account. Type the new user name to continue.',
+    );
+    if (!confirmed || !mounted) {
       return;
     }
 
@@ -107,6 +125,22 @@ class _AdminUserManagementScreenState
     if (formData == null) {
       return;
     }
+    if (!mounted) {
+      return;
+    }
+
+    final confirmed = await showAdminNameConfirmationDialog(
+      context: context,
+      title: 'Confirm User Update',
+      entityLabel: 'user',
+      expectedName: user.name,
+      actionLabel: 'Save User',
+      warning:
+          'This will change this user profile. Type the current user name to continue.',
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
 
     setState(() {
       _isSubmitting = true;
@@ -149,35 +183,19 @@ class _AdminUserManagementScreenState
   }
 
   Future<void> _removeUser(_AdminUserRecord user) async {
-    final shouldRemove = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Remove User'),
-            content: Text(
-              'Remove ${user.name} from the app?\n\n'
-              'This deletes the Firestore user profile and unlinks managed '
-              'farmers if needed. It does not delete the Firebase Auth '
-              'account because Admin SDK is not configured here.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Remove'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final confirmed = await showAdminNameConfirmationDialog(
+      context: context,
+      title: 'Remove User',
+      entityLabel: 'user',
+      expectedName: user.name,
+      actionLabel: 'Remove User',
+      destructive: true,
+      warning: 'This deletes the Firestore user profile and unlinks managed '
+          'farmers if needed. It does not delete the Firebase Auth account. '
+          'Type the user name to continue.',
+    );
 
-    if (!shouldRemove) {
+    if (!confirmed || !mounted) {
       return;
     }
 
@@ -240,9 +258,14 @@ class _AdminUserManagementScreenState
           data: (snapshot) {
             final allUsers = snapshot.docs
                 .map(_AdminUserRecord.fromDoc)
+                .where((user) => !user.isRemoved)
                 .toList(growable: false);
             final filteredUsers = _filterUsers(allUsers);
             final counts = _AdminUserCounts.from(allUsers);
+            final roleFilterOptions = _roleFilterOptionsFor(
+              allUsers,
+              selectedRole: _selectedRole,
+            );
 
             return Column(
               children: [
@@ -276,6 +299,45 @@ class _AdminUserManagementScreenState
                         borderSide: BorderSide.none,
                       ),
                     ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    12,
+                    horizontalPadding,
+                    0,
+                  ),
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedRole,
+                    decoration: InputDecoration(
+                      labelText: 'Filter by role',
+                      prefixIcon: const Icon(Icons.filter_list),
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    items: roleFilterOptions
+                        .map(
+                          (role) => DropdownMenuItem(
+                            value: role,
+                            child: Text(
+                              role == 'all' ? 'All Roles' : _roleLabel(role),
+                            ),
+                          ),
+                        )
+                        .toList(growable: false),
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      setState(() {
+                        _selectedRole = value;
+                      });
+                    },
                   ),
                 ),
                 Padding(
@@ -450,7 +512,7 @@ class _AdminUserManagementScreenState
                                   child: Text(
                                     allUsers.isEmpty
                                         ? 'No users found in Firestore yet.'
-                                        : 'No users match the current search.',
+                                        : 'No users match the current filters.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: Colors.grey.shade700,
@@ -490,21 +552,26 @@ class _AdminUserManagementScreenState
 
   List<_AdminUserRecord> _filterUsers(List<_AdminUserRecord> users) {
     final filtered = users.where((user) {
-      if (_search.isEmpty) {
-        return true;
+      if (_selectedRole != 'all' &&
+          _normalizedRole(user.role) != _selectedRole) {
+        return false;
       }
 
-      final values = <String>[
-        user.name,
-        user.email,
-        user.phone,
-        user.role,
-        user.managerCode,
-        user.farmManagerName,
-        user.farmManagerCode,
-      ];
+      if (_search.isNotEmpty) {
+        final values = <String>[
+          user.name,
+          user.email,
+          user.phone,
+          user.role,
+          user.managerCode,
+          user.farmManagerName,
+          user.farmManagerCode,
+        ];
 
-      return values.any((value) => value.toLowerCase().contains(_search));
+        return values.any((value) => value.toLowerCase().contains(_search));
+      }
+
+      return true;
     }).toList();
 
     filtered.sort((left, right) {
@@ -659,7 +726,7 @@ class _UserTile extends StatelessWidget {
                   backgroundColor:
                       _roleColor(user.role).withValues(alpha: 0.14),
                   child: Text(
-                    _initialsFor(_roleLabel(user.role)),
+                    _initialsFor(user.name),
                     style: TextStyle(
                       color: _roleColor(user.role),
                       fontWeight: FontWeight.w700,
@@ -676,9 +743,7 @@ class _UserTile extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isCurrentUser
-                                  ? 'Current Account'
-                                  : '${_roleLabel(user.role)} Account',
+                              user.name,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
@@ -713,9 +778,7 @@ class _UserTile extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                isCurrentUser
-                                    ? 'Current Account'
-                                    : '${_roleLabel(user.role)} Account',
+                                user.name,
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -747,8 +810,8 @@ class _UserTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         isCurrentUser
-                            ? 'Open your profile settings'
-                            : 'Tap to edit account access',
+                            ? '${_roleLabel(user.role)} - Open your profile settings'
+                            : '${_roleLabel(user.role)} - Tap to edit account access',
                         style: TextStyle(color: Colors.grey.shade700),
                       ),
                     ],
@@ -849,7 +912,7 @@ class _AdminUserDialogState extends State<_AdminUserDialog> {
     _farmManagerCodeController = TextEditingController(
       text: widget.user?.farmManagerCode ?? '',
     );
-    _role = widget.user?.role ?? 'farmer';
+    _role = _normalizedRole(widget.user?.role ?? 'farmer');
   }
 
   @override
@@ -864,6 +927,8 @@ class _AdminUserDialogState extends State<_AdminUserDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final roleItems = _roleDialogItems(_role);
+
     return AlertDialog(
       title: Text(_isEditMode ? 'Edit User' : 'Add New User'),
       content: SingleChildScrollView(
@@ -962,20 +1027,7 @@ class _AdminUserDialogState extends State<_AdminUserDialog> {
                 decoration: const InputDecoration(
                   labelText: 'Role',
                 ),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'admin',
-                    child: Text('Admin'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'farm_manager',
-                    child: Text('Farm Manager'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'farmer',
-                    child: Text('Farmer'),
-                  ),
-                ],
+                items: roleItems,
                 onChanged: _isEditMode
                     ? null
                     : (value) {
@@ -1125,6 +1177,7 @@ class _AdminUserRecord {
     required this.managerCode,
     required this.farmManagerName,
     required this.farmManagerCode,
+    required this.isRemoved,
   });
 
   final String id;
@@ -1135,6 +1188,7 @@ class _AdminUserRecord {
   final String managerCode;
   final String farmManagerName;
   final String farmManagerCode;
+  final bool isRemoved;
 
   factory _AdminUserRecord.fromDoc(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
@@ -1149,6 +1203,7 @@ class _AdminUserRecord {
       managerCode: (data['managerCode'] ?? '').toString().trim(),
       farmManagerName: (data['farmManagerName'] ?? '').toString().trim(),
       farmManagerCode: (data['farmManagerCode'] ?? '').toString().trim(),
+      isRemoved: data['isRemoved'] == true,
     );
   }
 }
@@ -1186,14 +1241,85 @@ class _AdminUserDialogResult {
   final _AdminUserFormData? data;
 }
 
+const List<String> _knownRoleValues = [
+  'admin',
+  'farm_manager',
+  'kvk',
+  'agriculture_officer',
+  'farmer',
+];
+
+List<String> _roleFilterOptionsFor(
+  List<_AdminUserRecord> users, {
+  required String selectedRole,
+}) {
+  final roles = <String>{
+    'all',
+    ..._knownRoleValues,
+    if (selectedRole.trim().isNotEmpty) _normalizedRole(selectedRole),
+  };
+
+  for (final user in users) {
+    roles.add(_normalizedRole(user.role));
+  }
+
+  final sortedRoles = roles.toList(growable: false);
+  sortedRoles.sort((left, right) {
+    if (left == 'all') {
+      return -1;
+    }
+    if (right == 'all') {
+      return 1;
+    }
+
+    final roleCompare = _roleOrder(left).compareTo(_roleOrder(right));
+    if (roleCompare != 0) {
+      return roleCompare;
+    }
+    return _roleLabel(left).compareTo(_roleLabel(right));
+  });
+
+  return sortedRoles;
+}
+
+List<DropdownMenuItem<String>> _roleDialogItems(String selectedRole) {
+  final roles = <String>{
+    ..._knownRoleValues,
+    _normalizedRole(selectedRole),
+  }.toList(growable: false);
+
+  roles.sort((left, right) {
+    final roleCompare = _roleOrder(left).compareTo(_roleOrder(right));
+    if (roleCompare != 0) {
+      return roleCompare;
+    }
+    return _roleLabel(left).compareTo(_roleLabel(right));
+  });
+
+  return roles
+      .map(
+        (role) => DropdownMenuItem(
+          value: role,
+          child: Text(_roleLabel(role)),
+        ),
+      )
+      .toList(growable: false);
+}
+
 int _roleOrder(String role) {
   switch (_normalizedRole(role)) {
     case 'admin':
       return 0;
     case 'farm_manager':
       return 1;
-    default:
+    case 'kvk':
       return 2;
+    case 'agriculture_officer':
+      return 3;
+    case 'farmer':
+      return 4;
+    default:
+      return 5;
   }
 }
 
@@ -1203,23 +1329,47 @@ Color _roleColor(String role) {
       return const Color(0xFF1F6D2C);
     case 'farm_manager':
       return const Color(0xFFD97706);
+    case 'kvk':
+      return const Color(0xFF4F46E5);
+    case 'agriculture_officer':
+      return const Color(0xFF15803D);
     default:
       return const Color(0xFF0E7490);
   }
 }
 
 String _normalizedRole(String role) {
-  return role.trim().toLowerCase();
+  final normalized = role.trim().toLowerCase().replaceAll(' ', '_');
+  return normalized.isEmpty ? 'farmer' : normalized;
 }
 
 String _roleLabel(String role) {
-  switch (_normalizedRole(role)) {
+  final normalized = _normalizedRole(role);
+  switch (normalized) {
     case 'admin':
       return 'Admin';
     case 'farm_manager':
       return 'Farm Manager';
-    default:
+    case 'kvk':
+      return 'KVK';
+    case 'agriculture_officer':
+      return 'Agriculture Officer';
+    case 'farmer':
       return 'Farmer';
+    default:
+      final parts = normalized
+          .split(RegExp(r'[_\s]+'))
+          .where((part) => part.isNotEmpty)
+          .toList(growable: false);
+      if (parts.length == 1 && parts.first.length <= 3) {
+        return parts.first.toUpperCase();
+      }
+      return parts
+          .map(
+            (part) =>
+                '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+          )
+          .join(' ');
   }
 }
 

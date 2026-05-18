@@ -149,7 +149,7 @@ class _OverviewBody extends StatelessWidget {
           child: Container(
             color: AdminFarmOverviewScreen.panelTint,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(14, 16, 14, 20),
+              padding: _overviewContentPadding(context, top: 16),
               children: [
                 const _SectionLabel(label: 'SUMMARY'),
                 const SizedBox(height: 10),
@@ -274,7 +274,7 @@ class _AdminFarmOverviewRecordsScreenState
                 child: Container(
                   color: AdminFarmOverviewScreen.panelTint,
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 20),
+                    padding: _overviewContentPadding(context),
                     children: [
                       TextField(
                         controller: _searchController,
@@ -407,7 +407,7 @@ class AdminFarmRecordDetailScreen extends ConsumerWidget {
                 child: Container(
                   color: AdminFarmOverviewScreen.panelTint,
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 20),
+                    padding: _overviewContentPadding(context),
                     children: [
                       Container(
                         padding: const EdgeInsets.all(18),
@@ -549,9 +549,17 @@ class _OverviewHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding = ResponsiveLayout.pagePadding(
+      context,
+      compact: 14,
+      regular: 18,
+      wide: 22,
+    );
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+      padding:
+          EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 18),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -593,16 +601,7 @@ class _OverviewHeader extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'FarmTrack',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             'Good morning, $userName',
             style: TextStyle(
@@ -616,9 +615,8 @@ class _OverviewHeader extends StatelessWidget {
             'Farm Overview',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 33,
+              fontSize: 32,
               fontWeight: FontWeight.w800,
-              letterSpacing: -0.6,
             ),
           ),
         ],
@@ -638,9 +636,17 @@ class _SubPageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding = ResponsiveLayout.pagePadding(
+      context,
+      compact: 14,
+      regular: 18,
+      wide: 22,
+    );
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+      padding:
+          EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 18),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -681,15 +687,6 @@ class _SubPageHeader extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'FarmTrack',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-            ),
           ),
           const SizedBox(height: 10),
           Text(
@@ -726,25 +723,27 @@ class _ResponsiveScreenFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width =
-            constraints.maxWidth <= 430 ? constraints.maxWidth : 420.0;
-
-        return Align(
-          alignment: Alignment.topCenter,
-          child: SizedBox(
-            width: width,
-            height: constraints.maxHeight,
-            child: ColoredBox(
-              color: Colors.white,
-              child: child,
-            ),
-          ),
-        );
-      },
+    return SizedBox.expand(
+      child: ColoredBox(
+        color: Colors.white,
+        child: child,
+      ),
     );
   }
+}
+
+EdgeInsets _overviewContentPadding(
+  BuildContext context, {
+  double top = 14,
+}) {
+  final horizontal = ResponsiveLayout.pagePadding(
+    context,
+    compact: 14,
+    regular: 16,
+    wide: 22,
+  );
+
+  return EdgeInsets.fromLTRB(horizontal, top, horizontal, 20);
 }
 
 class _OverviewError extends StatelessWidget {

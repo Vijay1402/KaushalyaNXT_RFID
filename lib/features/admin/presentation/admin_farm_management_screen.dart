@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/widgets/responsive_layout.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
 import '../../farm_manager/presentation/farm_manager_providers.dart';
+import 'admin_confirmation_dialog.dart';
 import 'admin_farm_detail_screen.dart';
 import 'admin_management_forms.dart';
 import 'admin_management_service.dart';
@@ -33,6 +34,21 @@ class _AdminFarmManagementScreenState
   Future<void> _addFarm() async {
     final formData = await showAdminFarmFormDialog(context);
     if (formData == null) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final confirmed = await showAdminNameConfirmationDialog(
+      context: context,
+      title: 'Confirm New Farm',
+      entityLabel: 'farm',
+      expectedName: formData.name,
+      actionLabel: 'Add Farm',
+      warning: 'This will add a new farm. Type the farm name to continue.',
+    );
+    if (!confirmed || !mounted) {
       return;
     }
 

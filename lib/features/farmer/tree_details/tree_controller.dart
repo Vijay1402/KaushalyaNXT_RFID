@@ -176,13 +176,29 @@ class TreeIssueController {
         .doc()
         .id;
 
+    final metadata = await _issueVisibilityMetadata(
+      treeDocId: trimmedTreeDocId,
+      user: user,
+      fallbackOwnerName: ownerName,
+    );
+
     final issueData = <String, dynamic>{
       'reportId': reportId,
       'treeDocId': trimmedTreeDocId,
       'treeId': treeId.trim(),
       'species': species.trim(),
       'healthStatus': healthStatus.trim(),
-      'ownerName': ownerName?.trim() ?? '',
+      'ownerName': metadata['ownerName'] ?? ownerName?.trim() ?? '',
+      'farmerName': metadata['farmerName'] ?? ownerName?.trim() ?? '',
+      'userId': metadata['userId'] ?? user.uid,
+      'farmerId': metadata['farmerId'] ?? user.uid,
+      'userEmail': metadata['userEmail'] ?? user.email?.trim() ?? '',
+      'farmerEmail': metadata['farmerEmail'] ?? user.email?.trim() ?? '',
+      'managerId': metadata['managerId'] ?? '',
+      'farmManagerId': metadata['farmManagerId'] ?? '',
+      'managerCode': metadata['managerCode'] ?? '',
+      'farmManagerCode': metadata['farmManagerCode'] ?? '',
+      'farmManagerName': metadata['farmManagerName'] ?? '',
       'note': note?.trim() ?? '',
       'localImagePath': imagePath?.trim() ?? '',
       'status': 'open',
@@ -234,18 +250,23 @@ class TreeIssueController {
       }
     }
 
-    await _firestore
-        .collection('trees')
-        .doc(treeDocId)
-        .collection('issues')
-        .doc(reportId)
-        .set({
+    final syncedIssueData = {
       'reportId': reportId,
       'treeDocId': treeDocId,
       'treeId': (issue['treeId'] ?? '').toString(),
       'species': (issue['species'] ?? '').toString(),
       'healthStatus': (issue['healthStatus'] ?? '').toString(),
       'ownerName': (issue['ownerName'] ?? '').toString(),
+      'farmerName': (issue['farmerName'] ?? '').toString(),
+      'userId': (issue['userId'] ?? '').toString(),
+      'farmerId': (issue['farmerId'] ?? '').toString(),
+      'userEmail': (issue['userEmail'] ?? '').toString(),
+      'farmerEmail': (issue['farmerEmail'] ?? '').toString(),
+      'managerId': (issue['managerId'] ?? '').toString(),
+      'farmManagerId': (issue['farmManagerId'] ?? '').toString(),
+      'managerCode': (issue['managerCode'] ?? '').toString(),
+      'farmManagerCode': (issue['farmManagerCode'] ?? '').toString(),
+      'farmManagerName': (issue['farmManagerName'] ?? '').toString(),
       'note': (issue['note'] ?? '').toString(),
       'hasImage': imageUrl.isNotEmpty,
       'imageUrl': imageUrl,
@@ -254,6 +275,28 @@ class TreeIssueController {
       'reportedByUid': (issue['reportedByUid'] ?? '').toString(),
       'reportedByEmail': (issue['reportedByEmail'] ?? '').toString(),
       'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    await _firestore
+        .collection('trees')
+        .doc(treeDocId)
+        .collection('issues')
+        .doc(reportId)
+        .set(syncedIssueData, SetOptions(merge: true));
+
+    await _firestore
+        .collection('issues')
+        .doc(reportId)
+        .set(syncedIssueData, SetOptions(merge: true));
+
+    await _firestore.collection('trees').doc(treeDocId).set({
+      'latestIssueId': reportId,
+      'latestIssueNote': (issue['note'] ?? '').toString(),
+      'latestIssueStatus': (issue['status'] ?? 'open').toString(),
+      'latestIssueReportedByUid': (issue['reportedByUid'] ?? '').toString(),
+      'latestIssueReportedByEmail': (issue['reportedByEmail'] ?? '').toString(),
+      'latestIssueAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
@@ -269,6 +312,16 @@ class TreeIssueController {
       'species': (issue['species'] ?? '').toString(),
       'healthStatus': (issue['healthStatus'] ?? '').toString(),
       'ownerName': (issue['ownerName'] ?? '').toString(),
+      'farmerName': (issue['farmerName'] ?? '').toString(),
+      'userId': (issue['userId'] ?? '').toString(),
+      'farmerId': (issue['farmerId'] ?? '').toString(),
+      'userEmail': (issue['userEmail'] ?? '').toString(),
+      'farmerEmail': (issue['farmerEmail'] ?? '').toString(),
+      'managerId': (issue['managerId'] ?? '').toString(),
+      'farmManagerId': (issue['farmManagerId'] ?? '').toString(),
+      'managerCode': (issue['managerCode'] ?? '').toString(),
+      'farmManagerCode': (issue['farmManagerCode'] ?? '').toString(),
+      'farmManagerName': (issue['farmManagerName'] ?? '').toString(),
       'note': (issue['note'] ?? '').toString(),
       'hasImage': imageUrl.isNotEmpty,
       'imageUrl': imageUrl,
@@ -288,6 +341,83 @@ class TreeIssueController {
     });
 
     await _cache.removePendingIssue(userId, reportId);
+  }
+
+  Future<Map<String, String>> _issueVisibilityMetadata({
+    required String treeDocId,
+    required User user,
+    String? fallbackOwnerName,
+  }) async {
+    Map<String, dynamic> treeData = const <String, dynamic>{};
+    Map<String, dynamic> userData = const <String, dynamic>{};
+
+    try {
+      final treeDoc = await _firestore.collection('trees').doc(treeDocId).get();
+      treeData = treeDoc.data() ?? const <String, dynamic>{};
+    } catch (_) {
+      treeData = const <String, dynamic>{};
+    }
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      userData = userDoc.data() ?? const <String, dynamic>{};
+    } catch (_) {
+      userData = const <String, dynamic>{};
+    }
+
+    final farmerName = firstNonEmptyString([
+      treeData['farmerName'],
+      treeData['ownerName'],
+      userData['name'],
+      fallbackOwnerName,
+    ]);
+    final farmerEmail = firstNonEmptyString([
+      treeData['farmerEmail'],
+      treeData['userEmail'],
+      treeData['ownerEmail'],
+      userData['email'],
+      user.email,
+    ]);
+    final farmerId = firstNonEmptyString([
+      treeData['farmerId'],
+      treeData['userId'],
+      treeData['ownerId'],
+      treeData['uid'],
+      userData['farmerId'],
+      user.uid,
+    ]);
+    final managerId = firstNonEmptyString([
+      treeData['farmManagerId'],
+      treeData['managerId'],
+      userData['farmManagerId'],
+      userData['managerId'],
+    ]);
+    final managerCode = firstNonEmptyString([
+      treeData['farmManagerCode'],
+      treeData['managerCode'],
+      userData['farmManagerCode'],
+      userData['managerCode'],
+    ]);
+    final managerName = firstNonEmptyString([
+      treeData['farmManagerName'],
+      treeData['managerName'],
+      userData['farmManagerName'],
+      userData['managerName'],
+    ]);
+
+    return <String, String>{
+      'ownerName': farmerName,
+      'farmerName': farmerName,
+      'userId': farmerId,
+      'farmerId': farmerId,
+      'userEmail': farmerEmail,
+      'farmerEmail': farmerEmail,
+      'managerId': managerId,
+      'farmManagerId': managerId,
+      'managerCode': managerCode,
+      'farmManagerCode': managerCode,
+      'farmManagerName': managerName,
+    };
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/widgets/responsive_layout.dart';
 import '../../farm_manager/presentation/farm_manager_data.dart';
 import '../../farm_manager/presentation/farm_manager_providers.dart';
+import 'admin_confirmation_dialog.dart';
 import 'admin_management_forms.dart';
 import 'admin_management_service.dart';
 import 'admin_tree_detail_screen.dart';
@@ -32,6 +33,22 @@ class _AdminFarmDetailScreenState extends ConsumerState<AdminFarmDetailScreen> {
     );
 
     if (formData == null) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final confirmed = await showAdminNameConfirmationDialog(
+      context: context,
+      title: 'Confirm New Tree',
+      entityLabel: 'tree',
+      expectedName: formData.treeId,
+      actionLabel: 'Add Tree',
+      warning:
+          'This will add a tree to ${farm.name}. Type the tree ID to continue.',
+    );
+    if (!confirmed || !mounted) {
       return;
     }
 
@@ -80,6 +97,22 @@ class _AdminFarmDetailScreenState extends ConsumerState<AdminFarmDetailScreen> {
     if (formData == null) {
       return;
     }
+    if (!mounted) {
+      return;
+    }
+
+    final confirmed = await showAdminNameConfirmationDialog(
+      context: context,
+      title: 'Confirm Farm Update',
+      entityLabel: 'farm',
+      expectedName: farm.name,
+      actionLabel: 'Save Farm',
+      warning:
+          'This will change the farm record. Type the current farm name to continue.',
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
 
     setState(() {
       _isWorking = true;
@@ -115,33 +148,19 @@ class _AdminFarmDetailScreenState extends ConsumerState<AdminFarmDetailScreen> {
   }
 
   Future<void> _deleteFarm(FarmManagerFarm farm) async {
-    final shouldDelete = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Delete Farm'),
-            content: Text(
-              'Delete ${farm.name} and ${farm.treeDocIds.length} linked tree(s)?'
-              '\n\nThis also removes tree issue records.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final confirmed = await showAdminNameConfirmationDialog(
+      context: context,
+      title: 'Delete Farm',
+      entityLabel: 'farm',
+      expectedName: farm.name,
+      actionLabel: 'Delete Farm',
+      destructive: true,
+      warning: 'This will delete ${farm.name} and ${farm.treeDocIds.length} '
+          'linked tree(s), including tree issue records. Type the farm name '
+          'to continue.',
+    );
 
-    if (!shouldDelete) {
+    if (!confirmed || !mounted) {
       return;
     }
 

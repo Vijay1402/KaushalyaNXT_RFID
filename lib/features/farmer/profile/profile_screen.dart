@@ -88,13 +88,6 @@ class ProfileScreen extends ConsumerWidget {
               PopupMenuItem(
                 value: 5,
                 child: ListTile(
-                  leading: const Icon(Icons.storage),
-                  title: Text(context.tr('localStorage')),
-                ),
-              ),
-              PopupMenuItem(
-                value: 6,
-                child: ListTile(
                   leading: const Icon(Icons.language),
                   title: Text(context.tr('language')),
                 ),
@@ -115,9 +108,6 @@ class ProfileScreen extends ConsumerWidget {
                   showAboutAppDialog(context);
                   break;
                 case 5:
-                  context.push('/local-storage');
-                  break;
-                case 6:
                   _showLanguageDialog(context, ref);
                   break;
               }

@@ -274,6 +274,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           child: Text('KVK'),
                         ),
                         const DropdownMenuItem(
+                          value: 'agriculture_officer',
+                          child: Text('Agriculture Officer'),
+                        ),
+                        const DropdownMenuItem(
                           value: 'admin',
                           child: Text('Admin'),
                         ),
